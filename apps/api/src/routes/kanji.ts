@@ -13,6 +13,8 @@ import {
   DeleteKanjiParams,
   RecordKanjiWrongParams,
   RecordKanjiWrongResponse,
+  MarkKanjiStudiedParams,
+  MarkKanjiStudiedResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -166,6 +168,27 @@ router.post("/kanji/:id/easy", async (req, res): Promise<void> => {
   }
 
   res.json(RecordKanjiWrongResponse.parse(kanji));
+});
+
+router.post("/kanji/:id/studied", async (req, res): Promise<void> => {
+  const params = MarkKanjiStudiedParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [kanji] = await db
+    .update(kanjiTable)
+    .set({ studiedAt: new Date() })
+    .where(eq(kanjiTable.id, params.data.id))
+    .returning();
+
+  if (!kanji) {
+    res.status(404).json({ error: "Kanji not found" });
+    return;
+  }
+
+  res.json(MarkKanjiStudiedResponse.parse(kanji));
 });
 
 export default router;

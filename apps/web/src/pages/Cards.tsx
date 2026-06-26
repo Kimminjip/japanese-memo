@@ -3,16 +3,18 @@ import {
   useListWords, useListKanji,
   useDeleteWord, useDeleteKanji,
   useUpdateWord, useUpdateKanji,
+  useMarkWordStudied, useMarkKanjiStudied,
   getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Flashcard } from "@/components/Flashcard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Trash2, Pencil, Plus, X } from "lucide-react";
+import { Search, Trash2, Pencil, Plus, X, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
 
 const WEAK_THRESHOLD = 3;
@@ -30,6 +32,8 @@ function CardListItem({
 }) {
   const updateWord = useUpdateWord();
   const updateKanji = useUpdateKanji();
+  const markWordStudied = useMarkWordStudied();
+  const markKanjiStudied = useMarkKanjiStudied();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,6 +73,24 @@ function CardListItem({
       });
     }
   }, [item, updateWord, updateKanji, queryClient, toast]);
+
+  const handleMarkStudied = useCallback(() => {
+    if (item.cardType === "word") {
+      markWordStudied.mutate({ id: item.id }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListWordsQueryKey() });
+          toast({ title: "✓ 오늘 학습으로 기록했습니다." });
+        },
+      });
+    } else {
+      markKanjiStudied.mutate({ id: item.id }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListKanjiQueryKey() });
+          toast({ title: "✓ 오늘 학습으로 기록했습니다." });
+        },
+      });
+    }
+  }, [item, markWordStudied, markKanjiStudied, queryClient, toast]);
 
   const startPress = () => {
     didLongPress.current = false;
@@ -138,6 +160,21 @@ function CardListItem({
           <Pencil className="h-4 w-4" />
         </Button>
       </div>
+      {/* 오늘 학습 버튼 */}
+      <button
+        className={cn(
+          "absolute bottom-2 right-2 z-20 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
+          item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString()
+            ? "bg-primary/10 text-primary opacity-100"
+            : "bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
+        )}
+        onClick={(e) => { e.stopPropagation(); handleMarkStudied(); }}
+        onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleMarkStudied(); }}
+        title="오늘 학습으로 기록"
+      >
+        <BookOpen className="h-3 w-3" />
+        {item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString() ? "오늘 학습" : "학습 기록"}
+      </button>
     </div>
   );
 }
@@ -168,9 +205,9 @@ export default function Cards() {
       const q = search.toLowerCase();
       return list.filter(item => {
         if (item.cardType === "word") {
-          return item.japanese.includes(q) || item.korean.includes(q) || (item.furigana && item.furigana.includes(q));
+          return item.japanese.includes(q) || item.korean.toLowerCase().includes(q) || (item.furigana && item.furigana.includes(q));
         } else {
-          return item.character.includes(q) || item.onyomi.includes(q) || item.kunyomi.includes(q);
+          return item.character.includes(q) || item.onyomi.includes(q) || item.kunyomi.includes(q) || item.korean.toLowerCase().includes(q);
         }
       });
     }

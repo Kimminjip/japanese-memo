@@ -30,7 +30,9 @@ export const ListWordsResponseItem = zod.object({
   furigana: zod.string().nullish(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 export const ListWordsResponse = zod.array(ListWordsResponseItem);
 
@@ -56,7 +58,9 @@ export const GetWordResponse = zod.object({
   furigana: zod.string().nullish(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -80,7 +84,9 @@ export const UpdateWordResponse = zod.object({
   furigana: zod.string().nullish(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -103,7 +109,9 @@ export const RecordWordWrongResponse = zod.object({
   furigana: zod.string().nullish(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -119,7 +127,27 @@ export const RecordWordEasyResponse = zod.object({
   furigana: zod.string().nullish(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
+});
+
+/**
+ * @summary Mark a word as studied today
+ */
+export const MarkWordStudiedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkWordStudiedResponse = zod.object({
+  id: zod.number(),
+  japanese: zod.string(),
+  furigana: zod.string().nullish(),
+  korean: zod.string(),
+  wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -139,7 +167,9 @@ export const ListKanjiResponseItem = zod.object({
   kunyomi: zod.string(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 export const ListKanjiResponse = zod.array(ListKanjiResponseItem);
 
@@ -167,7 +197,9 @@ export const GetKanjiResponse = zod.object({
   kunyomi: zod.string(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -193,7 +225,9 @@ export const UpdateKanjiResponse = zod.object({
   kunyomi: zod.string(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -217,7 +251,9 @@ export const RecordKanjiWrongResponse = zod.object({
   kunyomi: zod.string(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**
@@ -234,7 +270,28 @@ export const RecordKanjiEasyResponse = zod.object({
   kunyomi: zod.string(),
   korean: zod.string(),
   wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
+});
+
+/**
+ * @summary Mark a kanji as studied today
+ */
+export const MarkKanjiStudiedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkKanjiStudiedResponse = zod.object({
+  id: zod.number(),
+  character: zod.string(),
+  onyomi: zod.string(),
+  kunyomi: zod.string(),
+  korean: zod.string(),
+  wrongCount: zod.number(),
+  manualWeak: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  studiedAt: zod.coerce.date().nullable(),
 });
 
 /**

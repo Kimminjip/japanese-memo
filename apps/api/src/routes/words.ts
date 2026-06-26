@@ -13,6 +13,8 @@ import {
   DeleteWordParams,
   RecordWordWrongParams,
   RecordWordWrongResponse,
+  MarkWordStudiedParams,
+  MarkWordStudiedResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -164,6 +166,27 @@ router.post("/words/:id/easy", async (req, res): Promise<void> => {
   }
 
   res.json(RecordWordWrongResponse.parse(word));
+});
+
+router.post("/words/:id/studied", async (req, res): Promise<void> => {
+  const params = MarkWordStudiedParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [word] = await db
+    .update(wordsTable)
+    .set({ studiedAt: new Date() })
+    .where(eq(wordsTable.id, params.data.id))
+    .returning();
+
+  if (!word) {
+    res.status(404).json({ error: "Word not found" });
+    return;
+  }
+
+  res.json(MarkWordStudiedResponse.parse(word));
 });
 
 export default router;

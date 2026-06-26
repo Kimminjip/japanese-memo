@@ -10,8 +10,9 @@ export const wordsTable = pgTable("words", {
   wrongCount: integer("wrong_count").notNull().default(1),
   manualWeak: boolean("manual_weak").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  studiedAt: timestamp("studied_at"),
 }, (table) => [uniqueIndex("words_japanese_unique").on(table.japanese)]);
 
-export const insertWordSchema = createInsertSchema(wordsTable).omit({ id: true, wrongCount: true, createdAt: true });
+export const insertWordSchema = createInsertSchema(wordsTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true });
 export type InsertWord = z.infer<typeof insertWordSchema>;
 export type Word = typeof wordsTable.$inferSelect;

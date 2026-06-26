@@ -25,8 +25,9 @@ export interface Word {
   furigana?: string | null;
   korean: string;
   wrongCount: number;
-  manualWeak?: boolean;
+  manualWeak: boolean;
   createdAt: string;
+  studiedAt: string | null;
 }
 
 export interface Kanji {
@@ -36,8 +37,9 @@ export interface Kanji {
   kunyomi: string;
   korean: string;
   wrongCount: number;
-  manualWeak?: boolean;
+  manualWeak: boolean;
   createdAt: string;
+  studiedAt: string | null;
 }
 
 export interface StatsSummary {
@@ -129,6 +131,15 @@ export function useRecordWordEasy() {
   });
 }
 
+export function useMarkWordStudied() {
+  return useMutation<Word, Error, { id: number }>({
+    mutationFn: async ({ id }) => {
+      const res = await api.post(`/words/${id}/studied`);
+      return res.data;
+    },
+  });
+}
+
 // ─── Kanji ─────────────────────────────────────────────────────────────────────
 
 export function useListKanji(
@@ -184,6 +195,15 @@ export function useRecordKanjiEasy() {
   return useMutation<Kanji, Error, { id: number }>({
     mutationFn: async ({ id }) => {
       const res = await api.post(`/kanji/${id}/easy`);
+      return res.data;
+    },
+  });
+}
+
+export function useMarkKanjiStudied() {
+  return useMutation<Kanji, Error, { id: number }>({
+    mutationFn: async ({ id }) => {
+      const res = await api.post(`/kanji/${id}/studied`);
       return res.data;
     },
   });
