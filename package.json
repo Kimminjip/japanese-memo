@@ -1,0 +1,16 @@
+{
+  "name": "japanese-memo",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter api start",
+    "db:push": "pnpm --filter db db:push",
+    "db:generate": "pnpm --filter db db:generate"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.2"
+  }
+}

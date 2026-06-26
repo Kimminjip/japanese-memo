@@ -1,0 +1,17 @@
+import { pgTable, serial, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const wordsTable = pgTable("words", {
+  id: serial("id").primaryKey(),
+  japanese: text("japanese").notNull(),
+  furigana: text("furigana"),
+  korean: text("korean").notNull(),
+  wrongCount: integer("wrong_count").notNull().default(1),
+  manualWeak: boolean("manual_weak").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [uniqueIndex("words_japanese_unique").on(table.japanese)]);
+
+export const insertWordSchema = createInsertSchema(wordsTable).omit({ id: true, wrongCount: true, createdAt: true });
+export type InsertWord = z.infer<typeof insertWordSchema>;
+export type Word = typeof wordsTable.$inferSelect;

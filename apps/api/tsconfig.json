@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@workspace/db": ["../../packages/db/src/index.ts"],
+      "@workspace/api-zod": ["../../packages/api-zod/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}
