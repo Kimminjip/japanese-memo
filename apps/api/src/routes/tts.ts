@@ -30,6 +30,7 @@ router.post("/tts", async (req, res): Promise<void> => {
 
   if (!response.ok) {
     const err = await response.text();
+    console.error("[TTS] Google API error:", response.status, err);
     res.status(502).json({ error: err });
     return;
   }
