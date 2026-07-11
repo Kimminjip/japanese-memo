@@ -105,21 +105,27 @@ function loadDeck(
   studyType: StudyType,
   cardRange: CardRange
 ): StudyCard[] {
-  let items: (StudyCard & { _createdAt?: string })[] = [];
+  let items: (StudyCard & { _createdAt?: string; _studiedAt?: string | null })[] = [];
 
   if (studyType === "words" || studyType === "both") {
-    items.push(...(words ?? []).map(w => ({ ...buildCardFromWord(w), _createdAt: w.createdAt })));
+    items.push(...(words ?? []).map(w => ({ ...buildCardFromWord(w), _createdAt: w.createdAt, _studiedAt: w.studiedAt })));
   }
   if (studyType === "kanji" || studyType === "both") {
-    items.push(...(kanji ?? []).map(k => ({ ...buildCardFromKanji(k), _createdAt: k.createdAt })));
+    items.push(...(kanji ?? []).map(k => ({ ...buildCardFromKanji(k), _createdAt: k.createdAt, _studiedAt: k.studiedAt })));
   }
 
   if (cardRange === "today") {
     const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-    items = items.filter(i => new Date(i._createdAt ?? "").getTime() >= twoDaysAgo);
+    items = items.filter(i =>
+      new Date(i._createdAt ?? "").getTime() >= twoDaysAgo ||
+      (i._studiedAt && new Date(i._studiedAt).getTime() >= twoDaysAgo)
+    );
   } else if (cardRange === "recent") {
     const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    items = items.filter(i => new Date(i._createdAt ?? "").getTime() >= oneWeekAgo);
+    items = items.filter(i =>
+      new Date(i._createdAt ?? "").getTime() >= oneWeekAgo ||
+      (i._studiedAt && new Date(i._studiedAt).getTime() >= oneWeekAgo)
+    );
   }
 
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
