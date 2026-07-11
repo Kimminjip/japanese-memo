@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, gte, desc, sql } from "drizzle-orm";
+import { eq, gte, desc, sql, or } from "drizzle-orm";
 import { db, wordsTable } from "@workspace/db";
 import {
   ListWordsQueryParams,
@@ -31,11 +31,11 @@ router.get("/words", async (req, res): Promise<void> => {
   if (query.data.dateFilter === "today") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    qb = qb.where(gte(wordsTable.createdAt, today));
+    qb = qb.where(or(gte(wordsTable.createdAt, today), gte(wordsTable.studiedAt, today)));
   } else if (query.data.dateFilter === "recent") {
     const recent = new Date();
     recent.setDate(recent.getDate() - 7);
-    qb = qb.where(gte(wordsTable.createdAt, recent));
+    qb = qb.where(or(gte(wordsTable.createdAt, recent), gte(wordsTable.studiedAt, recent)));
   }
 
   const words = await qb.orderBy(desc(wordsTable.createdAt));

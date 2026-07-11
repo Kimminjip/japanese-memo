@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, gte, desc, sql } from "drizzle-orm";
+import { eq, gte, desc, sql, or } from "drizzle-orm";
 import { db, kanjiTable } from "@workspace/db";
 import {
   ListKanjiQueryParams,
@@ -31,11 +31,11 @@ router.get("/kanji", async (req, res): Promise<void> => {
   if (query.data.dateFilter === "today") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    qb = qb.where(gte(kanjiTable.createdAt, today));
+    qb = qb.where(or(gte(kanjiTable.createdAt, today), gte(kanjiTable.studiedAt, today)));
   } else if (query.data.dateFilter === "recent") {
     const recent = new Date();
     recent.setDate(recent.getDate() - 7);
-    qb = qb.where(gte(kanjiTable.createdAt, recent));
+    qb = qb.where(or(gte(kanjiTable.createdAt, recent), gte(kanjiTable.studiedAt, recent)));
   }
 
   const kanjiList = await qb.orderBy(desc(kanjiTable.createdAt));
