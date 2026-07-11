@@ -268,6 +268,8 @@ export default function Cards() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
+          lang="ja"
+          inputMode="text"
         />
       </div>
 
