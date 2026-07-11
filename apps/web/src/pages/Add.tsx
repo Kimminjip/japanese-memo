@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { VirtualKeyboard } from "@/components/VirtualKeyboard";
 import { useCreateWord, useCreateKanji, useListWords, useListKanji, getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Keyboard, Plus, X, AlertTriangle, ChevronRight } from "lucide-react";
+import { Keyboard, Plus, X, AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
 import { ExcelImportKanji } from "@/components/ExcelImportKanji";
 import { useLocation } from "wouter";
@@ -58,10 +58,58 @@ export default function Add() {
   const onyomiRefs = useRef<(HTMLInputElement | null)[]>([]);
   const kunyomiRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const [aiLoadingWord, setAiLoadingWord] = useState(false);
+  const [aiLoadingKanji, setAiLoadingKanji] = useState(false);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createWord = useCreateWord();
   const createKanji = useCreateKanji();
+
+  const handleAiWord = async () => {
+    const japanese = wordForm.getValues("japanese").trim();
+    if (!japanese) { toast({ title: "일본어 단어를 먼저 입력해주세요.", variant: "destructive" }); return; }
+    setAiLoadingWord(true);
+    try {
+      const res = await fetch("/api/ai/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "word", text: japanese }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.furigana) wordForm.setValue("furigana", data.furigana);
+      if (data.korean?.length) setKoreanMeanings(data.korean);
+      toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
+    } catch {
+      toast({ title: "AI 자동입력에 실패했습니다.", variant: "destructive" });
+    } finally {
+      setAiLoadingWord(false);
+    }
+  };
+
+  const handleAiKanji = async () => {
+    const character = kanjiForm.getValues("character").trim();
+    if (!character) { toast({ title: "한자를 먼저 입력해주세요.", variant: "destructive" }); return; }
+    setAiLoadingKanji(true);
+    try {
+      const res = await fetch("/api/ai/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "kanji", text: character }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.onyomi?.length) setOnyomiReadings(data.onyomi);
+      if (data.kunyomi?.length) setKunyomiReadings(data.kunyomi);
+      if (data.korean) setKanjiKorean(data.korean);
+      toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
+    } catch {
+      toast({ title: "AI 자동입력에 실패했습니다.", variant: "destructive" });
+    } finally {
+      setAiLoadingKanji(false);
+    }
+  };
 
   const { data: existingWords } = useListWords();
   const { data: existingKanji } = useListKanji();
@@ -329,6 +377,17 @@ export default function Add() {
                     )}
                   />
 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                    onClick={handleAiWord}
+                    disabled={aiLoadingWord}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {aiLoadingWord ? "AI 입력 중..." : "AI 자동입력 (후리가나 · 한국어 뜻)"}
+                  </Button>
+
                   {duplicateWord && (
                     <button
                       type="button"
@@ -440,6 +499,17 @@ export default function Add() {
                       </FormItem>
                     )}
                   />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                    onClick={handleAiKanji}
+                    disabled={aiLoadingKanji}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {aiLoadingKanji ? "AI 입력 중..." : "AI 자동입력 (음독 · 훈독 · 뜻음)"}
+                  </Button>
 
                   {duplicateKanji && (
                     <button

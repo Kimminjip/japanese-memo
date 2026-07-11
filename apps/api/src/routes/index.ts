@@ -5,6 +5,7 @@ import kanjiRouter from "./kanji";
 import statsRouter from "./stats";
 import studySessionRouter from "./study-session";
 import ttsRouter from "./tts";
+import aiRouter from "./ai";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(kanjiRouter);
 router.use(statsRouter);
 router.use(studySessionRouter);
 router.use(ttsRouter);
+router.use(aiRouter);
 
 export default router;

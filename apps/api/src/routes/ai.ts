@@ -1,0 +1,51 @@
+import { Router, type IRouter } from "express";
+import Anthropic from "@anthropic-ai/sdk";
+
+const router: IRouter = Router();
+
+router.post("/ai/lookup", async (req, res): Promise<void> => {
+  const { type, text } = req.body;
+  if (!text || typeof text !== "string" || !["word", "kanji"].includes(type)) {
+    res.status(400).json({ error: "type(word|kanji) and text are required" });
+    return;
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "AI not configured" });
+    return;
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  const prompt = type === "word"
+    ? `일본어 단어 "${text}"의 정보를 JSON으로 반환해줘.
+형식: {"furigana": "히라가나 읽기", "korean": ["뜻1", "뜻2"]}
+- furigana: 히라가나로만 (한자 없이)
+- korean: 한국어 뜻 배열 (핵심 뜻 1~3개, 간결하게)
+JSON만 반환, 설명 없이.`
+    : `일본어 한자 "${text}"의 정보를 JSON으로 반환해줘.
+형식: {"onyomi": ["音読み1", "音読み2"], "kunyomi": ["訓読み1", "訓読み2"], "korean": "한국어 뜻음"}
+- onyomi: 음독(가타카나), 배열
+- kunyomi: 훈독(히라가나, 오쿠리가나 포함), 배열
+- korean: 한국어 뜻음 한 줄 (예: "수 みず・スイ")
+JSON만 반환, 설명 없이.`;
+
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 256,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    res.status(502).json({ error: "AI 응답 파싱 실패" });
+    return;
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  res.json(parsed);
+});
+
+export default router;
