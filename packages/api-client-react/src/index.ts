@@ -236,18 +236,20 @@ export function useGetWeakItems(options?: Partial<UseQueryOptions<WeakItems>>) {
 // ─── TTS ───────────────────────────────────────────────────────────────────────
 
 export function useSpeakJapanese() {
-  const audioRef = { current: null as HTMLAudioElement | null };
+  return async (text: string): Promise<void> => {
+    // AudioContext를 유저 제스처 시점에 미리 열어 autoplay 정책 우회
+    const ctx = new AudioContext();
 
-  return async (text: string) => {
-    try {
-      const res = await api.post<{ audioContent: string }>("/tts", { text });
-      const audio = new Audio(`data:audio/mp3;base64,${res.data.audioContent}`);
-      if (audioRef.current) audioRef.current.pause();
-      audioRef.current = audio;
-      audio.play();
-    } catch {
-      // TTS 실패 시 무시
-    }
+    const res = await api.post<{ audioContent: string }>("/tts", { text });
+    const binary = atob(res.data.audioContent);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.start(0);
   };
 }
 

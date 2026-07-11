@@ -137,7 +137,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={() => speakJapanese(item.japanese)}
+          onSpeak={() => speakJapanese(item.japanese).catch(e => console.error("TTS:", e))}
         />
       ) : (
         <Flashcard
@@ -151,7 +151,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={() => speakJapanese(item.character)}
+          onSpeak={() => speakJapanese(item.character).catch(e => console.error("TTS:", e))}
         />
       )}
       <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
