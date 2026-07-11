@@ -568,7 +568,8 @@ export default function Study() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); flipCard(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); goNextHardWithAnim(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); flipCard(); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); goNextEasyWithAnim(); }
       else if (e.key === "ArrowRight") { e.preventDefault(); goPrevWithAnim(); }
     };
