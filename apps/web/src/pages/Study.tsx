@@ -11,6 +11,7 @@ import {
   useGetStudySession,
   useSaveStudySession,
   useClearStudySession,
+  useSpeakJapanese,
   getListWordsQueryKey,
   getListKanjiQueryKey,
   getGetWeakItemsQueryKey,
@@ -213,6 +214,7 @@ export default function Study() {
   const recordKanjiWrongMutate = useRecordKanjiWrong();
   const recordWordEasyMutate = useRecordWordEasy();
   const recordKanjiEasyMutate = useRecordKanjiEasy();
+  const speakJapanese = useSpeakJapanese();
   const queryClient = useQueryClient();
 
   const wordsRef = useRef(words);
@@ -727,6 +729,7 @@ export default function Study() {
               isFlipped={isFlipped}
               onToggleWeak={handleToggleWeak}
               onEdit={handleEdit}
+              onSpeak={() => speakJapanese(card.japanese)}
             />
           </div>
         </div>
@@ -734,8 +737,8 @@ export default function Study() {
 
       {/* Hints */}
       <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-6 text-xs text-muted-foreground/50 text-center">
-        <span className="hidden sm:inline">클릭 · ↑↓ → 뒤집기</span>
-        <span className="sm:hidden">탭 → 뒤집기</span>
+        <span className="hidden sm:inline">클릭 · ↓ → 뒤집기 · ↑ → 어려움 · 좌하단 🔊 → 발음</span>
+        <span className="sm:hidden">탭 → 뒤집기 · 🔊 → 발음</span>
         <span className="hidden sm:inline">← → 쉬움(난이도↓) · → → 이전 카드</span>
         <span className={`hidden sm:inline ${hasPrev ? "" : "opacity-40"}`}>휠 위 → 어려움(난이도↑)</span>
         <span className="sm:hidden">← 쉬움 · → 이전 · 위 어려움</span>

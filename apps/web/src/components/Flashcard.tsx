@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Star, Pencil } from "lucide-react";
+import { Star, Pencil, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const WEAK_THRESHOLD = 3;
@@ -17,6 +17,7 @@ interface FlashcardProps {
   onFlip?: () => void;
   onToggleWeak?: () => void;
   onEdit?: () => void;
+  onSpeak?: () => void;
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -46,6 +47,7 @@ export function Flashcard({
   onFlip,
   onToggleWeak,
   onEdit,
+  onSpeak,
 }: FlashcardProps) {
   const [isFlippedInternal, setIsFlippedInternal] = useState(false);
   const isControlled = isFlippedProp !== undefined;
@@ -137,6 +139,18 @@ export function Flashcard({
       >
         {/* Front — 항상 고정 높이 (뒷면 길이와 무관) */}
         <div style={{ gridArea: "1/1" }} className="bg-card rounded-xl border shadow-sm backface-hidden flex flex-col items-center justify-center p-6 text-center h-52 sm:h-60 lg:h-72 relative">
+          {onSpeak && (
+            <button
+              className="absolute bottom-2 left-2 z-20 p-1.5 rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-200 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+              onClick={(e) => { e.stopPropagation(); onSpeak(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); onSpeak(); }}
+              title="발음 듣기"
+            >
+              <Volume2 className="h-4 w-4" />
+            </button>
+          )}
           {/* Show wrongCount badge only when not using star toggle and count > 0 */}
           {!onToggleWeak && wrongCount !== undefined && wrongCount > 0 && (
             isWeak ? (

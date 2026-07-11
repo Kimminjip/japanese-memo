@@ -233,6 +233,24 @@ export function useGetWeakItems(options?: Partial<UseQueryOptions<WeakItems>>) {
   });
 }
 
+// ─── TTS ───────────────────────────────────────────────────────────────────────
+
+export function useSpeakJapanese() {
+  const audioRef = { current: null as HTMLAudioElement | null };
+
+  return async (text: string) => {
+    try {
+      const res = await api.post<{ audioContent: string }>("/tts", { text });
+      const audio = new Audio(`data:audio/mp3;base64,${res.data.audioContent}`);
+      if (audioRef.current) audioRef.current.pause();
+      audioRef.current = audio;
+      audio.play();
+    } catch {
+      // TTS 실패 시 무시
+    }
+  };
+}
+
 // ─── Study Session ─────────────────────────────────────────────────────────────
 
 export function useGetStudySession(options?: { query?: Partial<UseQueryOptions<StudySessionResponse>> }) {

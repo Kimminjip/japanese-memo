@@ -4,6 +4,7 @@ import {
   useDeleteWord, useDeleteKanji,
   useUpdateWord, useUpdateKanji,
   useMarkWordStudied, useMarkKanjiStudied,
+  useSpeakJapanese,
   getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ function CardListItem({
   const updateKanji = useUpdateKanji();
   const markWordStudied = useMarkWordStudied();
   const markKanjiStudied = useMarkKanjiStudied();
+  const speakJapanese = useSpeakJapanese();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,6 +137,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
+          onSpeak={() => speakJapanese(item.japanese)}
         />
       ) : (
         <Flashcard
@@ -148,6 +151,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
+          onSpeak={() => speakJapanese(item.character)}
         />
       )}
       <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
