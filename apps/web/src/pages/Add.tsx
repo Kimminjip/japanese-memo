@@ -76,13 +76,14 @@ export default function Add() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "word", text: japanese }),
       });
-      if (!res.ok) throw new Error();
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "failed");
       if (data.furigana) wordForm.setValue("furigana", data.furigana);
       if (data.korean?.length) setKoreanMeanings(data.korean);
       toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
-    } catch {
-      toast({ title: "AI 자동입력에 실패했습니다.", variant: "destructive" });
+    } catch (e: any) {
+      const msg = e?.message ?? "";
+      toast({ title: msg.includes("AI not configured") ? "서버에 ANTHROPIC_API_KEY가 설정되지 않았습니다." : "AI 자동입력에 실패했습니다.", variant: "destructive" });
     } finally {
       setAiLoadingWord(false);
     }
@@ -98,14 +99,15 @@ export default function Add() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "kanji", text: character }),
       });
-      if (!res.ok) throw new Error();
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "failed");
       if (data.onyomi?.length) setOnyomiReadings(data.onyomi);
       if (data.kunyomi?.length) setKunyomiReadings(data.kunyomi);
       if (data.korean) setKanjiKorean(data.korean);
       toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
-    } catch {
-      toast({ title: "AI 자동입력에 실패했습니다.", variant: "destructive" });
+    } catch (e: any) {
+      const msg = e?.message ?? "";
+      toast({ title: msg.includes("AI not configured") ? "서버에 ANTHROPIC_API_KEY가 설정되지 않았습니다." : "AI 자동입력에 실패했습니다.", variant: "destructive" });
     } finally {
       setAiLoadingKanji(false);
     }
