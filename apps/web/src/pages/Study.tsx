@@ -770,14 +770,14 @@ export default function Study() {
       </div>
 
       {/* Hints */}
-      <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-6 text-xs text-muted-foreground/50 text-center">
-        <span className="hidden sm:inline">클릭 · ↓ → 뒤집기 · ↑ → 어려움 · 좌하단 🔊 → 발음</span>
-        <span className="sm:hidden">탭 → 뒤집기 · 🔊 → 발음</span>
-        <span className="hidden sm:inline">← → 쉬움(난이도↓) · → → 이전 카드</span>
-        <span className={`hidden sm:inline ${hasPrev ? "" : "opacity-40"}`}>휠 위 → 어려움(난이도↑)</span>
-        <span className="sm:hidden">← 쉬움 · → 이전 · 위 어려움</span>
-        <span className="hidden sm:inline">우상단 ★ → 취약항목 등록/해제</span>
-        <span className="sm:hidden">꾹 누르기 → 취약항목 ★</span>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground/60">
+        <span className="hidden sm:inline">클릭 뒤집기</span>
+        <span className="sm:hidden">탭 뒤집기</span>
+        <span>← 쉬움</span>
+        <span>→ 이전</span>
+        <span>↑ 어려움</span>
+        <span className="hidden sm:inline">★ 취약</span>
+        <span className="sm:hidden">길게 취약</span>
       </div>
 
       {editTarget && (

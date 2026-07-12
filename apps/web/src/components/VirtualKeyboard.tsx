@@ -112,7 +112,7 @@ export function VirtualKeyboard({ onInput, onBackspace, onClose }: VirtualKeyboa
   );
 
   return (
-    <div ref={rootRef} data-keyboard-portal="true" className="fixed bottom-0 left-0 right-0 md:left-auto md:right-8 md:bottom-8 md:w-[400px] bg-card border shadow-xl md:rounded-xl overflow-hidden z-[200] animate-in slide-in-from-bottom-5">
+    <div ref={rootRef} data-keyboard-portal="true" className="fixed bottom-0 left-0 right-0 md:left-auto md:right-8 md:bottom-8 md:w-[400px] bg-card border shadow-xl md:rounded-xl overflow-hidden z-[200] animate-in slide-in-from-bottom-5 pb-[env(safe-area-inset-bottom)] md:pb-0">
       <div className="flex items-center justify-between p-2 border-b bg-muted/50">
         <div className="flex items-center gap-2 ml-2">
           <span className="text-sm font-medium text-muted-foreground">일본어 키보드</span>

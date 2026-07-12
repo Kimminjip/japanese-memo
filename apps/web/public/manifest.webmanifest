@@ -1,0 +1,24 @@
+{
+  "name": "日本語勉強 · 일본어 공부",
+  "short_name": "일본어공부",
+  "description": "일본어 단어와 한자를 카드로 학습하는 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf6ee",
+  "theme_color": "#a81f42",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

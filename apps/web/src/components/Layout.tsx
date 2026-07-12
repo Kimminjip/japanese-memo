@@ -44,7 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Mobile Nav */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b bg-card">
+      <div className="md:hidden flex items-center justify-between p-4 border-b bg-card sticky top-0 z-40 pt-[max(1rem,env(safe-area-inset-top))]">
         <Link href="/" className="flex items-center gap-2 text-primary font-serif font-bold text-xl">
           <BookOpen className="h-6 w-6" />
           <span>日本語勉強</span>
