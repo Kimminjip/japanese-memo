@@ -729,7 +729,7 @@ export default function Study() {
               isFlipped={isFlipped}
               onToggleWeak={handleToggleWeak}
               onEdit={handleEdit}
-              onSpeak={() => speakJapanese(card.japanese).catch(e => console.error("TTS:", e))}
+              onSpeak={() => speakJapanese(card.japanese)}
             />
           </div>
         </div>
