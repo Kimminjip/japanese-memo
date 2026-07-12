@@ -66,18 +66,28 @@ export default function Add() {
   const createWord = useCreateWord();
   const createKanji = useCreateKanji();
 
+  const callAi = async (body: object) => {
+    const res = await fetch("/api/ai/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "failed");
+    return data;
+  };
+
   const handleAiWord = async () => {
     const japanese = wordForm.getValues("japanese").trim();
-    if (!japanese) { toast({ title: "일본어 단어를 먼저 입력해주세요.", variant: "destructive" }); return; }
+    const korean = koreanMeanings.map(m => m.trim()).filter(Boolean).join("\n");
+    if (!japanese && !korean) {
+      toast({ title: "일본어 단어 또는 한국어 뜻을 먼저 입력해주세요.", variant: "destructive" });
+      return;
+    }
     setAiLoadingWord(true);
     try {
-      const res = await fetch("/api/ai/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "word", text: japanese }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "failed");
+      const data = await callAi({ type: "word", text: japanese, korean });
+      if (data.japanese) wordForm.setValue("japanese", data.japanese);
       if (data.furigana) wordForm.setValue("furigana", data.furigana);
       if (data.korean?.length) setKoreanMeanings(data.korean);
       toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
@@ -91,16 +101,14 @@ export default function Add() {
 
   const handleAiKanji = async () => {
     const character = kanjiForm.getValues("character").trim();
-    if (!character) { toast({ title: "한자를 먼저 입력해주세요.", variant: "destructive" }); return; }
+    if (!character && !kanjiKorean.trim()) {
+      toast({ title: "한자 또는 한국어 뜻음을 먼저 입력해주세요.", variant: "destructive" });
+      return;
+    }
     setAiLoadingKanji(true);
     try {
-      const res = await fetch("/api/ai/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "kanji", text: character }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "failed");
+      const data = await callAi({ type: "kanji", text: character, korean: kanjiKorean.trim() });
+      if (data.character) kanjiForm.setValue("character", data.character);
       if (data.onyomi?.length) setOnyomiReadings(data.onyomi);
       if (data.kunyomi?.length) setKunyomiReadings(data.kunyomi);
       if (data.korean) setKanjiKorean(data.korean);
@@ -379,17 +387,6 @@ export default function Add() {
                     )}
                   />
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
-                    onClick={handleAiWord}
-                    disabled={aiLoadingWord}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {aiLoadingWord ? "AI 입력 중..." : "AI 자동입력 (후리가나 · 한국어 뜻)"}
-                  </Button>
-
                   {duplicateWord && (
                     <button
                       type="button"
@@ -470,6 +467,17 @@ export default function Add() {
                     </Button>
                   </div>
 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                    onClick={handleAiWord}
+                    disabled={aiLoadingWord}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {aiLoadingWord ? "AI 입력 중..." : "AI 자동입력 (후리가나 · 한국어 뜻)"}
+                  </Button>
+
                   <Button type="submit" size="lg" className="w-full text-lg h-14" disabled={createWord.isPending || !!duplicateWord} data-testid="button-submit-word">
                     {createWord.isPending ? "추가 중..." : duplicateWord ? "이미 등록된 단어" : "단어 추가하기"}
                   </Button>
@@ -501,17 +509,6 @@ export default function Add() {
                       </FormItem>
                     )}
                   />
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
-                    onClick={handleAiKanji}
-                    disabled={aiLoadingKanji}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {aiLoadingKanji ? "AI 입력 중..." : "AI 자동입력 (음독 · 훈독 · 뜻음)"}
-                  </Button>
 
                   {duplicateKanji && (
                     <button
@@ -644,6 +641,17 @@ export default function Add() {
                       onFocus={() => setActiveField(null)}
                     />
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                    onClick={handleAiKanji}
+                    disabled={aiLoadingKanji}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {aiLoadingKanji ? "AI 입력 중..." : "AI 자동입력 (음독 · 훈독 · 뜻음)"}
+                  </Button>
 
                   <Button type="submit" size="lg" className="w-full text-lg h-14" disabled={createKanji.isPending || !!duplicateKanji} data-testid="button-submit-kanji">
                     {createKanji.isPending ? "추가 중..." : duplicateKanji ? "이미 등록된 한자" : "한자 추가하기"}

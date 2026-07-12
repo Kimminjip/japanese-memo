@@ -16,6 +16,7 @@ import {
   getListKanjiQueryKey,
   getGetWeakItemsQueryKey,
 } from "@workspace/api-client-react";
+
 import { useQueryClient } from "@tanstack/react-query";
 import { Flashcard } from "@/components/Flashcard";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
@@ -23,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Settings, Shuffle, ArrowLeft, AlertCircle } from "lucide-react";
+import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX } from "lucide-react";
 import { Link, useSearch } from "wouter";
 
 const WEAK_THRESHOLD = 3;
@@ -215,6 +216,7 @@ export default function Study() {
   const recordWordEasyMutate = useRecordWordEasy();
   const recordKanjiEasyMutate = useRecordKanjiEasy();
   const speakJapanese = useSpeakJapanese();
+  const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
   const queryClient = useQueryClient();
 
   const wordsRef = useRef(words);
@@ -455,6 +457,23 @@ export default function Study() {
 
   const flipCard = useCallback(() => setIsFlipped(f => !f), []);
 
+  // 카드 앞면 표시 시 TTS 자동재생
+  useEffect(() => {
+    if (!ttsEnabled || deck.length === 0) return;
+    const card = deck[currentIdx];
+    if (!card) return;
+    let text = "";
+    if (card.type === "word") {
+      text = card.japanese;
+    } else {
+      const kun = (card.kunyomi ?? "").split("\n")[0].trim();
+      const on = (card.onyomi ?? "").split("\n")[0].trim();
+      text = [kun, on].filter(Boolean).join("、");
+    }
+    if (text) speakJapanese(text);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx, deck.length, ttsEnabled]);
+
   const recordScore = useCallback((direction: "easy" | "hard") => {
     const card = deck[currentIdx];
     if (!card) return;
@@ -688,6 +707,22 @@ export default function Study() {
           {isLastCard && (
             <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">마지막 카드</span>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}
+            onClick={e => {
+              e.stopPropagation();
+              setTtsEnabled(v => {
+                const next = !v;
+                localStorage.setItem("study-tts", next ? "on" : "off");
+                return next;
+              });
+            }}
+            title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"}
+          >
+            {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
           <span className="text-sm text-muted-foreground font-medium">{studyStep} / {deck.length}장</span>
         </div>
       </div>
@@ -729,7 +764,6 @@ export default function Study() {
               isFlipped={isFlipped}
               onToggleWeak={handleToggleWeak}
               onEdit={handleEdit}
-              onSpeak={() => speakJapanese(card.japanese)}
             />
           </div>
         </div>
