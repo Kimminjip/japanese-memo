@@ -236,27 +236,29 @@ export function useGetWeakItems(options?: Partial<UseQueryOptions<WeakItems>>) {
 // ─── TTS ───────────────────────────────────────────────────────────────────────
 
 export function useSpeakJapanese() {
-  return async (text: string): Promise<void> => {
-    try {
-      // Google Cloud TTS 시도
-      const ctx = new AudioContext();
-      const res = await api.post<{ audioContent: string }>("/tts", { text });
-      const binary = atob(res.data.audioContent);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.start(0);
-    } catch {
-      // 폴백: 브라우저 내장 Web Speech API
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "ja-JP";
-      utterance.rate = 0.9;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utterance);
-    }
+  return (text: string): void => {
+    // 클릭 즉시 Web Speech API 실행 (user gesture context 필요)
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ja-JP";
+    utterance.rate = 0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+
+    // 백그라운드에서 Google Cloud TTS 시도 — 성공 시 더 좋은 음질로 교체
+    api.post<{ audioContent: string }>("/tts", { text })
+      .then(async (res) => {
+        speechSynthesis.cancel();
+        const ctx = new AudioContext();
+        const binary = atob(res.data.audioContent);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.start(0);
+      })
+      .catch(() => { /* Google TTS 실패 시 Web Speech 계속 사용 */ });
   };
 }
 
