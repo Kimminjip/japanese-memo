@@ -4,9 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 const router: IRouter = Router();
 
 router.post("/ai/lookup", async (req, res): Promise<void> => {
-  const { type, text, korean } = req.body;
-  if (!["word", "kanji"].includes(type) || (!text && !korean)) {
-    res.status(400).json({ error: "type(word|kanji) and text or korean are required" });
+  const { type, text, korean, furigana } = req.body;
+  if (!["word", "kanji"].includes(type) || (!text && !korean && !furigana)) {
+    res.status(400).json({ error: "type(word|kanji) and text, korean, or furigana are required" });
     return;
   }
 
@@ -25,6 +25,12 @@ router.post("/ai/lookup", async (req, res): Promise<void> => {
       prompt = `일본어 단어 "${text}"의 정보를 JSON으로 반환해줘.
 형식: {"furigana": "히라가나 읽기", "korean": ["뜻1", "뜻2"]}
 - furigana: 히라가나로만 (한자 없이)
+- korean: 한국어 뜻 배열 (핵심 뜻 1~3개, 간결하게)
+JSON만 반환, 설명 없이.`;
+    } else if (furigana) {
+      prompt = `일본어 히라가나 읽기 "${furigana}"에 해당하는 일본어 단어를 JSON으로 반환해줘.
+형식: {"japanese": "한자 포함 일본어 단어", "furigana": "${furigana}", "korean": ["뜻1", "뜻2"]}
+- japanese: 해당 읽기에 맞는 한자 표기 단어 (한자가 없는 단어면 히라가나 그대로)
 - korean: 한국어 뜻 배열 (핵심 뜻 1~3개, 간결하게)
 JSON만 반환, 설명 없이.`;
     } else {

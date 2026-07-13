@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { VirtualKeyboard } from "@/components/VirtualKeyboard";
 import { useCreateWord, useCreateKanji, useListWords, useListKanji, getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Keyboard, Plus, X, AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
+import { Keyboard, Plus, X, AlertTriangle, ChevronRight, Sparkles, RotateCcw } from "lucide-react";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
 import { ExcelImportKanji } from "@/components/ExcelImportKanji";
 import { useLocation } from "wouter";
@@ -79,14 +79,15 @@ export default function Add() {
 
   const handleAiWord = async () => {
     const japanese = wordForm.getValues("japanese").trim();
+    const furigana = wordForm.getValues("furigana")?.trim() ?? "";
     const korean = koreanMeanings.map(m => m.trim()).filter(Boolean).join("\n");
-    if (!japanese && !korean) {
-      toast({ title: "일본어 단어 또는 한국어 뜻을 먼저 입력해주세요.", variant: "destructive" });
+    if (!japanese && !furigana && !korean) {
+      toast({ title: "일본어, 후리가나, 한국어 뜻 중 하나는 먼저 입력해주세요.", variant: "destructive" });
       return;
     }
     setAiLoadingWord(true);
     try {
-      const data = await callAi({ type: "word", text: japanese, korean });
+      const data = await callAi({ type: "word", text: japanese, korean, furigana: japanese ? "" : furigana });
       if (data.japanese) wordForm.setValue("japanese", data.japanese);
       if (data.furigana) wordForm.setValue("furigana", data.furigana);
       if (data.korean?.length) setKoreanMeanings(data.korean);
@@ -97,6 +98,18 @@ export default function Add() {
     } finally {
       setAiLoadingWord(false);
     }
+  };
+
+  const handleResetWord = () => {
+    wordForm.reset({ japanese: "", furigana: "" });
+    setKoreanMeanings([""]);
+  };
+
+  const handleResetKanji = () => {
+    kanjiForm.reset({ character: "" });
+    setOnyomiReadings([""]);
+    setKunyomiReadings([""]);
+    setKanjiKorean("");
   };
 
   const handleAiKanji = async () => {
@@ -467,16 +480,28 @@ export default function Add() {
                     </Button>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
-                    onClick={handleAiWord}
-                    disabled={aiLoadingWord}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {aiLoadingWord ? "AI 입력 중..." : "AI 자동입력 (후리가나 · 한국어 뜻)"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                      onClick={handleAiWord}
+                      disabled={aiLoadingWord}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {aiLoadingWord ? "AI 입력 중..." : "AI 자동입력 (일본어 · 후리가나 · 한국어 뜻)"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="text-muted-foreground shrink-0"
+                      onClick={handleResetWord}
+                      title="입력 초기화"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
 
                   <Button type="submit" size="lg" className="w-full text-lg h-14" disabled={createWord.isPending || !!duplicateWord} data-testid="button-submit-word">
                     {createWord.isPending ? "추가 중..." : duplicateWord ? "이미 등록된 단어" : "단어 추가하기"}
@@ -642,16 +667,28 @@ export default function Add() {
                     />
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
-                    onClick={handleAiKanji}
-                    disabled={aiLoadingKanji}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {aiLoadingKanji ? "AI 입력 중..." : "AI 자동입력 (음독 · 훈독 · 뜻음)"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                      onClick={handleAiKanji}
+                      disabled={aiLoadingKanji}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {aiLoadingKanji ? "AI 입력 중..." : "AI 자동입력 (음독 · 훈독 · 뜻음)"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="text-muted-foreground shrink-0"
+                      onClick={handleResetKanji}
+                      title="입력 초기화"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
 
                   <Button type="submit" size="lg" className="w-full text-lg h-14" disabled={createKanji.isPending || !!duplicateKanji} data-testid="button-submit-kanji">
                     {createKanji.isPending ? "추가 중..." : duplicateKanji ? "이미 등록된 한자" : "한자 추가하기"}
