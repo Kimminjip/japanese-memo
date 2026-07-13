@@ -27,11 +27,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX } from "lucide-react";
 import { Link, useSearch } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 const WEAK_THRESHOLD = 3;
 
 type StudyType = "both" | "words" | "kanji";
 type CardRange = "today" | "recent" | "all";
+type OrderMode = "random" | "sequence";
 type AnimPhase = "idle" | "exit-left" | "exit-right" | "exit-up" | "enter-right" | "enter-left" | "enter-down" | "cover-left";
 
 interface StudyCard {
@@ -49,6 +51,7 @@ interface StudyCard {
 
 const STORAGE_KEY_TYPE = "study_type";
 const STORAGE_KEY_RANGE = "study_range";
+const STORAGE_KEY_ORDER = "study_order";
 const SESSION_KEY = "study_session";
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -107,7 +110,8 @@ function loadDeck(
   words: any[] | undefined,
   kanji: any[] | undefined,
   studyType: StudyType,
-  cardRange: CardRange
+  cardRange: CardRange,
+  orderMode: OrderMode
 ): StudyCard[] {
   let items: (StudyCard & { _createdAt?: string; _studiedAt?: string | null })[] = [];
 
@@ -130,6 +134,10 @@ function loadDeck(
       new Date(i._createdAt ?? "").getTime() >= oneWeekAgo ||
       (i._studiedAt && new Date(i._studiedAt).getTime() >= oneWeekAgo)
     );
+  }
+
+  if (orderMode === "sequence") {
+    return [...items].sort((a, b) => new Date(a._createdAt ?? 0).getTime() - new Date(b._createdAt ?? 0).getTime());
   }
 
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
@@ -183,12 +191,16 @@ function tryRestoreSession(
 export default function Study() {
   const search = useSearch();
   const weakMode = new URLSearchParams(search).get("weak") === "true";
+  const { toast } = useToast();
 
   const [studyType, setStudyType] = useState<StudyType>(
     () => (localStorage.getItem(STORAGE_KEY_TYPE) as StudyType | null) ?? "both"
   );
   const [cardRange, setCardRange] = useState<CardRange>(
     () => (localStorage.getItem(STORAGE_KEY_RANGE) as CardRange | null) ?? "all"
+  );
+  const [orderMode, setOrderMode] = useState<OrderMode>(
+    () => (localStorage.getItem(STORAGE_KEY_ORDER) as OrderMode | null) ?? "random"
   );
 
   const [deck, setDeck] = useState<StudyCard[]>([]);
@@ -226,10 +238,12 @@ export default function Study() {
   const kanjiRef = useRef(kanji);
   const studyTypeRef = useRef(studyType);
   const cardRangeRef = useRef(cardRange);
+  const orderModeRef = useRef(orderMode);
   wordsRef.current = words;
   kanjiRef.current = kanji;
   studyTypeRef.current = studyType;
   cardRangeRef.current = cardRange;
+  orderModeRef.current = orderMode;
 
   const [deckKey, setDeckKey] = useState(0);
   const hasInitialized = useRef(false);
@@ -240,7 +254,7 @@ export default function Study() {
 
   const buildRemaining = (deckLen: number) => {
     const indices = Array.from({ length: deckLen }, (_, i) => i).slice(1);
-    return indices.sort(() => 0.5 - Math.random());
+    return orderModeRef.current === "sequence" ? indices : indices.sort(() => 0.5 - Math.random());
   };
 
   // 세션 저장 — localStorage + 서버 (debounced 800ms)
@@ -380,7 +394,7 @@ export default function Study() {
     if (deckKey === 0) return;
     const newDeck = weakMode
       ? loadDeckWeak(wordsRef.current, kanjiRef.current)
-      : loadDeck(wordsRef.current, kanjiRef.current, studyTypeRef.current, cardRangeRef.current);
+      : loadDeck(wordsRef.current, kanjiRef.current, studyTypeRef.current, cardRangeRef.current, orderModeRef.current);
     setDeck(newDeck);
     setCurrentIdx(0);
     setHistory([]);
@@ -406,6 +420,13 @@ export default function Study() {
     setDeckKey(k => k + 1);
   };
 
+  const handleOrderChange = (v: OrderMode) => {
+    setOrderMode(v);
+    localStorage.setItem(STORAGE_KEY_ORDER, v);
+    clearSessionAll();
+    setDeckKey(k => k + 1);
+  };
+
   const handleReshuffle = () => {
     clearSessionAll();
     setDeckKey(k => k + 1);
@@ -414,7 +435,17 @@ export default function Study() {
 
   const goNext = useCallback(() => {
     setRemaining(rem => {
-      if (rem.length === 0) return rem;
+      if (rem.length === 0) {
+        // 마지막 카드에서 더 넘기려 하면 안내 후 처음부터 다시 시작
+        toast({ title: "마지막 카드입니다. 처음부터 다시 시작합니다." });
+        const newRem = buildRemaining(deck.length);
+        setIsFlipped(false);
+        setHistory([]);
+        setStudyStep(1);
+        setCurrentIdx(0);
+        persistSession(deck, 0, [], newRem, 1, studyTypeRef.current, cardRangeRef.current);
+        return newRem;
+      }
       const next = rem[0];
       const newRem = rem.slice(1);
       setIsFlipped(false);
@@ -433,7 +464,7 @@ export default function Study() {
       });
       return newRem;
     });
-  }, [currentIdx, persistSession]);
+  }, [currentIdx, persistSession, deck, toast]);
 
   const goPrev = useCallback(() => {
     setHistory(h => {
@@ -610,12 +641,27 @@ export default function Study() {
       if (wheelCooldown.current) return;
       wheelCooldown.current = true;
       setTimeout(() => { wheelCooldown.current = false; }, 600);
-      if (e.deltaY < 0) goNextHardWithAnim();  // 스크롤 위 = 어려움 + 다음
-      else goNextEasyWithAnim();               // 스크롤 아래 = 쉬움 + 다음
+      if (e.deltaY < 0) goPrevWithAnim();  // 휠 위 = 이전 카드
+      else goNextWithAnim();               // 휠 아래 = 다음 카드
     };
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 1) return; // 휠 클릭(가운데 버튼)
+      e.preventDefault();
+      if (wheelCooldown.current) return;
+      wheelCooldown.current = true;
+      setTimeout(() => { wheelCooldown.current = false; }, 600);
+      goNextHardWithAnim();  // 휠 누름 = 어려움
+    };
+    const onAuxClick = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
     window.addEventListener("wheel", onWheel, { passive: false });
-    return () => window.removeEventListener("wheel", onWheel);
-  }, [goNextHardWithAnim, goNextEasyWithAnim]);
+    window.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("auxclick", onAuxClick);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("auxclick", onAuxClick);
+    };
+  }, [goNextWithAnim, goPrevWithAnim, goNextHardWithAnim]);
 
   // 수직 스와이프 시 페이지 스크롤 방지 (document에 passive:false로 등록)
   useEffect(() => {
@@ -652,8 +698,10 @@ export default function Study() {
                 <SettingsPanel
                   studyType={studyType}
                   cardRange={cardRange}
+                  orderMode={orderMode}
                   onTypeChange={handleTypeChange}
                   onRangeChange={handleRangeChange}
+                  onOrderChange={handleOrderChange}
                   onReshuffle={handleReshuffle}
                 />
               </SheetContent>
@@ -696,8 +744,10 @@ export default function Study() {
               <SettingsPanel
                 studyType={studyType}
                 cardRange={cardRange}
+                orderMode={orderMode}
                 onTypeChange={handleTypeChange}
                 onRangeChange={handleRangeChange}
+                onOrderChange={handleOrderChange}
                 onReshuffle={handleReshuffle}
               />
             </SheetContent>
@@ -783,6 +833,7 @@ export default function Study() {
         <span>← 쉬움</span>
         <span>→ 이전</span>
         <span>↑ 어려움</span>
+        <span className="hidden sm:inline">휠 다음/이전 · 휠클릭 어려움</span>
         <span className="hidden sm:inline">★ 취약</span>
         <span className="sm:hidden">길게 취약</span>
       </div>
@@ -795,12 +846,14 @@ export default function Study() {
 }
 
 function SettingsPanel({
-  studyType, cardRange, onTypeChange, onRangeChange, onReshuffle,
+  studyType, cardRange, orderMode, onTypeChange, onRangeChange, onOrderChange, onReshuffle,
 }: {
   studyType: StudyType;
   cardRange: CardRange;
+  orderMode: OrderMode;
   onTypeChange: (v: StudyType) => void;
   onRangeChange: (v: CardRange) => void;
+  onOrderChange: (v: OrderMode) => void;
   onReshuffle: () => void;
 }) {
   return (
@@ -841,6 +894,20 @@ function SettingsPanel({
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="all" id="s-all" />
               <Label htmlFor="s-all" className="font-normal">전체</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="space-y-3">
+          <Label className="text-base font-semibold">카드 순서</Label>
+          <RadioGroup value={orderMode} onValueChange={v => onOrderChange(v as OrderMode)} className="flex flex-col space-y-2">
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="random" id="s-order-random" />
+              <Label htmlFor="s-order-random" className="font-normal">랜덤 순서</Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="sequence" id="s-order-sequence" />
+              <Label htmlFor="s-order-sequence" className="font-normal">등록된 순서</Label>
             </div>
           </RadioGroup>
         </div>
