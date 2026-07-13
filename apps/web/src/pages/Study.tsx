@@ -12,6 +12,7 @@ import {
   useSaveStudySession,
   useClearStudySession,
   useSpeakJapanese,
+  useRecordActivity,
   getListWordsQueryKey,
   getListKanjiQueryKey,
   getGetWeakItemsQueryKey,
@@ -216,6 +217,7 @@ export default function Study() {
   const recordWordEasyMutate = useRecordWordEasy();
   const recordKanjiEasyMutate = useRecordKanjiEasy();
   const speakJapanese = useSpeakJapanese();
+  const recordActivity = useRecordActivity();
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
   const queryClient = useQueryClient();
 
@@ -477,6 +479,7 @@ export default function Study() {
   const recordScore = useCallback((direction: "easy" | "hard") => {
     const card = deck[currentIdx];
     if (!card) return;
+    recordActivity.mutate({ count: 1 });
     if (direction === "easy") {
       if (card.type === "word") recordWordEasyMutate.mutate({ id: card.id });
       else recordKanjiEasyMutate.mutate({ id: card.id });
@@ -484,7 +487,7 @@ export default function Study() {
       if (card.type === "word") recordWordWrongMutate.mutate({ id: card.id });
       else recordKanjiWrongMutate.mutate({ id: card.id });
     }
-  }, [deck, currentIdx, recordWordEasyMutate, recordKanjiEasyMutate, recordWordWrongMutate, recordKanjiWrongMutate]);
+  }, [deck, currentIdx, recordActivity, recordWordEasyMutate, recordKanjiEasyMutate, recordWordWrongMutate, recordKanjiWrongMutate]);
 
   // 슬라이드 애니메이션
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");

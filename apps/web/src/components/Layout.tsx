@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { BookOpen, Layers, PlusCircle, Gamepad2, AlertTriangle, Menu, GraduationCap } from "lucide-react";
+import { BookOpen, Layers, PlusCircle, Gamepad2, AlertTriangle, Menu, GraduationCap, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/add", label: "추가하기", icon: PlusCircle },
   { href: "/study", label: "공부하기", icon: GraduationCap },
   { href: "/quiz", label: "퀴즈", icon: Gamepad2 },
+  { href: "/stats", label: "학습 통계", icon: BarChart3 },
   { href: "/weak", label: "취약 항목", icon: AlertTriangle },
 ];
 

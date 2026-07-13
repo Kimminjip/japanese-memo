@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useListWords, useListKanji, useRecordWordWrong, useRecordKanjiWrong, useGetWeakItems } from "@workspace/api-client-react";
+import { useListWords, useListKanji, useRecordWordWrong, useRecordKanjiWrong, useGetWeakItems, useRecordActivity } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -44,6 +44,7 @@ export default function Quiz() {
   
   const recordWordWrong = useRecordWordWrong();
   const recordKanjiWrong = useRecordKanjiWrong();
+  const recordActivity = useRecordActivity();
 
   // Auto-advance 1 second after correct answer
   useEffect(() => {
@@ -162,6 +163,11 @@ export default function Quiz() {
 
     const q = questions[currentIdx];
     const correct = option === q.correctAnswer;
+
+    // 문제당 첫 시도에서 학습 1회로 기록
+    if (wrongSelections.size === 0) {
+      recordActivity.mutate({ count: 1 });
+    }
 
     if (correct) {
       // Only count score if first attempt (no wrong selections yet)

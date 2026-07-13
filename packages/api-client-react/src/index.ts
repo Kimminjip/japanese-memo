@@ -17,6 +17,8 @@ export const getGetWeakItemsQueryKey = () => ["stats", "weak"] as const;
 
 export const getGetStudySessionQueryKey = () => ["study-session"] as const;
 
+export const getGetActivityQueryKey = () => ["stats", "activity"] as const;
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Word {
@@ -230,6 +232,36 @@ export function useGetWeakItems(options?: Partial<UseQueryOptions<WeakItems>>) {
       return data;
     },
     ...options,
+  });
+}
+
+// ─── Activity (학습 통계) ────────────────────────────────────────────────────────
+
+export interface ActivityStats {
+  todayCount: number;
+  weekCount: number;
+  totalCount: number;
+  currentStreak: number;
+  bestStreak: number;
+  heatmap: { date: string; count: number }[];
+}
+
+export function useGetActivity(options?: Partial<UseQueryOptions<ActivityStats>>) {
+  return useQuery<ActivityStats>({
+    queryKey: getGetActivityQueryKey(),
+    queryFn: async () => {
+      const { data } = await api.get("/stats/activity");
+      return data;
+    },
+    ...options,
+  });
+}
+
+export function useRecordActivity() {
+  return useMutation<void, Error, { count?: number }>({
+    mutationFn: async ({ count = 1 }) => {
+      await api.post("/stats/activity", { count });
+    },
   });
 }
 
