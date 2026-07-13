@@ -13,6 +13,7 @@ interface FlashcardProps {
   kunyomi?: string;
   wrongCount?: number;
   manualWeak?: boolean;
+  jlptLevel?: string | null;
   isFlipped?: boolean;
   onFlip?: () => void;
   onToggleWeak?: () => void;
@@ -43,6 +44,7 @@ export function Flashcard({
   kunyomi,
   wrongCount,
   manualWeak,
+  jlptLevel,
   isFlipped: isFlippedProp,
   onFlip,
   onToggleWeak,
@@ -139,6 +141,11 @@ export function Flashcard({
       >
         {/* Front — 항상 고정 높이 (뒷면 길이와 무관) */}
         <div style={{ gridArea: "1/1" }} className="bg-card rounded-xl border shadow-sm backface-hidden flex flex-col items-center justify-center p-6 text-center h-52 sm:h-60 lg:h-72 relative">
+          {jlptLevel && (
+            <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground/60">
+              {jlptLevel}
+            </span>
+          )}
           {onSpeak && (
             <button
               className="absolute bottom-2 left-2 z-20 p-1.5 rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-200 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"

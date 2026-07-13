@@ -6,6 +6,7 @@ import statsRouter from "./stats";
 import studySessionRouter from "./study-session";
 import ttsRouter from "./tts";
 import aiRouter from "./ai";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(statsRouter);
 router.use(studySessionRouter);
 router.use(ttsRouter);
 router.use(aiRouter);
+router.use(adminRouter);
 
 export default router;

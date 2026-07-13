@@ -33,6 +33,7 @@ export const ListWordsResponseItem = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 export const ListWordsResponse = zod.array(ListWordsResponseItem);
 
@@ -61,6 +62,7 @@ export const GetWordResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -87,6 +89,7 @@ export const UpdateWordResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -112,6 +115,7 @@ export const RecordWordWrongResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -130,6 +134,7 @@ export const RecordWordEasyResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -148,6 +153,7 @@ export const MarkWordStudiedResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -170,6 +176,7 @@ export const ListKanjiResponseItem = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 export const ListKanjiResponse = zod.array(ListKanjiResponseItem);
 
@@ -200,6 +207,7 @@ export const GetKanjiResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -228,6 +236,7 @@ export const UpdateKanjiResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -254,6 +263,7 @@ export const RecordKanjiWrongResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -273,6 +283,7 @@ export const RecordKanjiEasyResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**
@@ -292,6 +303,7 @@ export const MarkKanjiStudiedResponse = zod.object({
   manualWeak: zod.boolean(),
   createdAt: zod.coerce.date(),
   studiedAt: zod.coerce.date().nullable(),
+  jlptLevel: zod.string().nullable(),
 });
 
 /**

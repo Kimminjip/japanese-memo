@@ -44,6 +44,7 @@ interface StudyCard {
   kunyomi?: string;
   wrongCount?: number;
   manualWeak?: boolean;
+  jlptLevel?: string | null;
 }
 
 const STORAGE_KEY_TYPE = "study_type";
@@ -84,11 +85,11 @@ function clearLocalSession() {
 }
 
 function buildCardFromWord(w: any): StudyCard {
-  return { id: w.id, type: "word", japanese: w.japanese, furigana: w.furigana, korean: w.korean, wrongCount: w.wrongCount, manualWeak: w.manualWeak };
+  return { id: w.id, type: "word", japanese: w.japanese, furigana: w.furigana, korean: w.korean, wrongCount: w.wrongCount, manualWeak: w.manualWeak, jlptLevel: w.jlptLevel };
 }
 
 function buildCardFromKanji(k: any): StudyCard {
-  return { id: k.id, type: "kanji", japanese: k.character, onyomi: k.onyomi, kunyomi: k.kunyomi, korean: k.korean, wrongCount: k.wrongCount, manualWeak: k.manualWeak };
+  return { id: k.id, type: "kanji", japanese: k.character, onyomi: k.onyomi, kunyomi: k.kunyomi, korean: k.korean, wrongCount: k.wrongCount, manualWeak: k.manualWeak, jlptLevel: k.jlptLevel };
 }
 
 function difficultyWeight(wrongCount: number | undefined, manualWeak: boolean | undefined): number {
@@ -747,6 +748,7 @@ export default function Study() {
                 kunyomi={underlayCard.kunyomi}
                 wrongCount={underlayCard.wrongCount}
                 manualWeak={underlayCard.manualWeak}
+                jlptLevel={underlayCard.jlptLevel}
                 isFlipped={false}
                 onToggleWeak={() => {}}
                 onEdit={() => {}}
@@ -765,6 +767,7 @@ export default function Study() {
               kunyomi={card.kunyomi}
               wrongCount={card.wrongCount}
               manualWeak={card.manualWeak}
+              jlptLevel={card.jlptLevel}
               isFlipped={isFlipped}
               onToggleWeak={handleToggleWeak}
               onEdit={handleEdit}

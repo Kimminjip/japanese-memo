@@ -30,6 +30,7 @@ export interface Word {
   manualWeak: boolean;
   createdAt: string;
   studiedAt: string | null;
+  jlptLevel: string | null;
 }
 
 export interface Kanji {
@@ -42,6 +43,7 @@ export interface Kanji {
   manualWeak: boolean;
   createdAt: string;
   studiedAt: string | null;
+  jlptLevel: string | null;
 }
 
 export interface StatsSummary {

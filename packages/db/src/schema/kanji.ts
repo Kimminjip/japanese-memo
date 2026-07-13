@@ -12,8 +12,9 @@ export const kanjiTable = pgTable("kanji", {
   manualWeak: boolean("manual_weak").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   studiedAt: timestamp("studied_at"),
+  jlptLevel: text("jlpt_level"),
 }, (table) => [uniqueIndex("kanji_character_unique").on(table.character)]);
 
-export const insertKanjiSchema = createInsertSchema(kanjiTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true });
+export const insertKanjiSchema = createInsertSchema(kanjiTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true });
 export type InsertKanji = z.infer<typeof insertKanjiSchema>;
 export type Kanji = typeof kanjiTable.$inferSelect;

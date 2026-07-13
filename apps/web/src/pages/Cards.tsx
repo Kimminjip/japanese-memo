@@ -21,6 +21,7 @@ import { EditDialog, EditTarget } from "@/components/EditDialog";
 const WEAK_THRESHOLD = 3;
 
 type FilterType = "all" | "words" | "kanji";
+type JlptFilter = "all" | "N5" | "N4" | "N3" | "N2" | "N1" | "none";
 
 function CardListItem({
   item,
@@ -134,6 +135,7 @@ function CardListItem({
           korean={item.korean}
           wrongCount={item.wrongCount}
           manualWeak={item.manualWeak}
+          jlptLevel={item.jlptLevel}
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
@@ -148,6 +150,7 @@ function CardListItem({
           korean={item.korean}
           wrongCount={item.wrongCount}
           manualWeak={item.manualWeak}
+          jlptLevel={item.jlptLevel}
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
@@ -185,6 +188,7 @@ function CardListItem({
 
 export default function Cards() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [jlptFilter, setJlptFilter] = useState<JlptFilter>("all");
   const [search, setSearch] = useState("");
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
 
@@ -205,9 +209,13 @@ export default function Cards() {
       list.push(...kanji.map(k => ({ ...k, cardType: "kanji" as const })));
     }
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let result = list;
+    if (jlptFilter !== "all") {
+      result = result.filter(item => jlptFilter === "none" ? !item.jlptLevel : item.jlptLevel === jlptFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
-      return list.filter(item => {
+      result = result.filter(item => {
         if (item.cardType === "word") {
           return item.japanese.includes(q) || item.korean.toLowerCase().includes(q) || (item.furigana && item.furigana.includes(q));
         } else {
@@ -215,8 +223,8 @@ export default function Cards() {
         }
       });
     }
-    return list;
-  }, [words, kanji, filter, search]);
+    return result;
+  }, [words, kanji, filter, jlptFilter, search]);
 
   const handleDelete = (id: number, type: "word" | "kanji") => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
@@ -275,6 +283,23 @@ export default function Cards() {
           lang="ja"
           inputMode="text"
         />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(["all", "N5", "N4", "N3", "N2", "N1", "none"] as JlptFilter[]).map(lv => (
+          <button
+            key={lv}
+            onClick={() => setJlptFilter(lv)}
+            className={cn(
+              "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+              jlptFilter === lv
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-muted-foreground border-border hover:bg-muted"
+            )}
+          >
+            {lv === "all" ? "전체" : lv === "none" ? "미분류" : lv}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (

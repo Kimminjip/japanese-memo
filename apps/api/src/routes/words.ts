@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, gte, desc, sql, or } from "drizzle-orm";
 import { db, wordsTable } from "@workspace/db";
+import { classifyJlptLevel } from "../lib/jlpt";
 import {
   ListWordsQueryParams,
   ListWordsResponse,
@@ -50,10 +51,12 @@ router.post("/words", async (req, res): Promise<void> => {
   }
 
   try {
+    const jlptLevel = await classifyJlptLevel("word", parsed.data.japanese);
     const [word] = await db.insert(wordsTable).values({
       japanese: parsed.data.japanese,
       furigana: parsed.data.furigana ?? null,
       korean: parsed.data.korean,
+      jlptLevel,
     }).returning();
     res.status(201).json(GetWordResponse.parse(word));
   } catch (err: any) {
