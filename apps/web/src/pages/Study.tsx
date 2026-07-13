@@ -466,7 +466,8 @@ export default function Study() {
     if (!card) return;
     let text = "";
     if (card.type === "word") {
-      text = card.japanese;
+      // 후리가나가 있으면 정확한 발음을 위해 우선 사용 (한자 원문은 Google TTS가 잘못 읽을 수 있음)
+      text = (card.furigana ?? "").trim() || card.japanese;
     } else {
       const kun = (card.kunyomi ?? "").split("\n")[0].trim();
       const on = (card.onyomi ?? "").split("\n")[0].trim();

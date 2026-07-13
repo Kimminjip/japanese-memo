@@ -137,7 +137,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={() => speakJapanese(item.japanese)}
+          onSpeak={() => speakJapanese((item.furigana ?? "").trim() || item.japanese)}
         />
       ) : (
         <Flashcard
