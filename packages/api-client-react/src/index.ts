@@ -68,6 +68,7 @@ export interface StudySessionItem {
   studyStep: number;
   studyType: "both" | "words" | "kanji";
   cardRange: "today" | "recent" | "all";
+  orderMode?: "random" | "sequence";
   savedAt: number;
 }
 

@@ -363,6 +363,7 @@ export const GetStudySessionResponse = zod.object({
       studyStep: zod.number(),
       studyType: zod.enum(["both", "words", "kanji"]),
       cardRange: zod.enum(["today", "recent", "all"]),
+      orderMode: zod.enum(["random", "sequence"]).optional(),
       savedAt: zod.number(),
     })
     .nullable(),
@@ -384,6 +385,7 @@ export const SaveStudySessionBody = zod.object({
   studyStep: zod.number(),
   studyType: zod.enum(["both", "words", "kanji"]),
   cardRange: zod.enum(["today", "recent", "all"]),
+  orderMode: zod.enum(["random", "sequence"]).optional(),
   savedAt: zod.number(),
 });
 
@@ -402,6 +404,7 @@ export const SaveStudySessionResponse = zod.object({
       studyStep: zod.number(),
       studyType: zod.enum(["both", "words", "kanji"]),
       cardRange: zod.enum(["today", "recent", "all"]),
+      orderMode: zod.enum(["random", "sequence"]).optional(),
       savedAt: zod.number(),
     })
     .nullable(),

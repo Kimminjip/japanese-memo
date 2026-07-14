@@ -63,6 +63,7 @@ interface StudySession {
   studyStep: number;
   studyType: StudyType;
   cardRange: CardRange;
+  orderMode?: OrderMode;
   savedAt: number;
 }
 
@@ -270,6 +271,7 @@ export default function Study() {
       studyStep: step,
       studyType: st,
       cardRange: cr,
+      orderMode: orderModeRef.current,
       savedAt: Date.now(),
     };
     saveLocalSession(session);
@@ -366,6 +368,11 @@ export default function Study() {
           setCardRange(sessionToUse.cardRange);
           localStorage.setItem(STORAGE_KEY_RANGE, sessionToUse.cardRange);
           cardRangeRef.current = sessionToUse.cardRange;
+        }
+        if (sessionToUse.orderMode && sessionToUse.orderMode !== orderModeRef.current) {
+          setOrderMode(sessionToUse.orderMode);
+          localStorage.setItem(STORAGE_KEY_ORDER, sessionToUse.orderMode);
+          orderModeRef.current = sessionToUse.orderMode;
         }
 
         const restored = tryRestoreSession(
@@ -627,8 +634,8 @@ export default function Study() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") { e.preventDefault(); goNextHardWithAnim(); }
       else if (e.key === "ArrowDown") { e.preventDefault(); flipCard(); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); goNextEasyWithAnim(); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); goPrevWithAnim(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); goNextEasyWithAnim(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); goPrevWithAnim(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -827,15 +834,16 @@ export default function Study() {
       </div>
 
       {/* Hints */}
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground/60">
-        <span className="hidden sm:inline">클릭 뒤집기</span>
-        <span className="sm:hidden">탭 뒤집기</span>
-        <span>← 쉬움</span>
-        <span>→ 이전</span>
-        <span>↑ 어려움</span>
-        <span className="hidden sm:inline">휠 다음/이전 · 휠클릭 어려움</span>
-        <span className="hidden sm:inline">★ 취약</span>
-        <span className="sm:hidden">길게 취약</span>
+      <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground/60">
+        <div className="hidden sm:flex flex-wrap justify-center gap-x-4">
+          <span>키보드: ↓ 뒤집기 · ↑ 어려움 · → 쉬움 · ← 이전 · ★ 취약</span>
+        </div>
+        <div className="hidden sm:flex flex-wrap justify-center gap-x-4">
+          <span>마우스: 클릭 뒤집기 · 휠 다음/이전 · 휠클릭 어려움</span>
+        </div>
+        <div className="sm:hidden flex flex-wrap justify-center gap-x-4">
+          <span>탭 뒤집기 · 길게 취약</span>
+        </div>
       </div>
 
       {editTarget && (
