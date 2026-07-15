@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX } from "lucide-react";
+import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -233,6 +233,8 @@ export default function Study() {
   const speakJapanese = useSpeakJapanese();
   const recordActivity = useRecordActivity();
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
+  const [autoplay, setAutoplay] = useState(false);
+  const autoplayRunToken = useRef(0);
   const queryClient = useQueryClient();
 
   const wordsRef = useRef(words);
@@ -498,9 +500,9 @@ export default function Study() {
 
   const flipCard = useCallback(() => setIsFlipped(f => !f), []);
 
-  // 카드 앞면 표시 시 TTS 자동재생
+  // 카드 앞면 표시 시 TTS 자동재생 (전체 자동재생 모드일 때는 그쪽에서 처리)
   useEffect(() => {
-    if (!ttsEnabled || deck.length === 0) return;
+    if (!ttsEnabled || autoplay || deck.length === 0) return;
     const card = deck[currentIdx];
     if (!card) return;
     let text = "";
@@ -514,7 +516,7 @@ export default function Study() {
     }
     if (text) speakJapanese(text);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIdx, deck.length, ttsEnabled]);
+  }, [currentIdx, deck.length, ttsEnabled, autoplay]);
 
   const recordScore = useCallback((direction: "easy" | "hard") => {
     const card = deck[currentIdx];
@@ -577,6 +579,51 @@ export default function Study() {
       setTimeout(() => { setAnimPhase("idle"); animLock.current = false; }, ANIM_MS);
     }, HARD_ANIM_MS);
   }, [recordScore, goNext]);
+
+  // 전체 자동재생 — 카드마다 앞면 내용을 2회(1초 간격) 읽고 다음 카드로 자동 이동
+  useEffect(() => {
+    if (!autoplay || deck.length === 0) return;
+    const card = deck[currentIdx];
+    if (!card) return;
+
+    const token = ++autoplayRunToken.current;
+    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+    const stillActive = () => autoplayRunToken.current === token;
+
+    const readOnce = async () => {
+      if (card.type === "word") {
+        const reading = (card.furigana ?? "").trim() || card.japanese;
+        const koreanFirst = (card.korean ?? "").split("\n")[0]?.trim() ?? "";
+        if (reading) await speakJapanese(reading, "ja");
+        if (!stillActive()) return;
+        if (koreanFirst) await speakJapanese(koreanFirst, "ko");
+      } else {
+        const kun = (card.kunyomi ?? "").split("\n")[0].trim();
+        const on = (card.onyomi ?? "").split("\n")[0].trim();
+        const text = [kun, on].filter(Boolean).join("、");
+        if (text) await speakJapanese(text, "ja");
+      }
+    };
+
+    (async () => {
+      await readOnce();
+      if (!stillActive()) return;
+      await sleep(1000);
+      if (!stillActive()) return;
+      await readOnce();
+      if (!stillActive()) return;
+      await sleep(1000);
+      if (!stillActive()) return;
+      goNextWithAnim();
+    })();
+
+    return () => { autoplayRunToken.current++; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplay, currentIdx, deck.length]);
+
+  const handleToggleAutoplay = useCallback(() => {
+    setAutoplay(v => !v);
+  }, []);
 
   // 터치 / 롱프레스
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -785,6 +832,15 @@ export default function Study() {
           >
             {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={autoplay ? "text-primary" : "text-muted-foreground/40"}
+            onClick={e => { e.stopPropagation(); handleToggleAutoplay(); }}
+            title={autoplay ? "자동재생 정지" : "자동재생 시작"}
+          >
+            {autoplay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
           <span className="text-sm text-muted-foreground font-medium">{studyStep} / {deck.length}장</span>
         </div>
       </div>
@@ -836,10 +892,10 @@ export default function Study() {
       {/* Hints */}
       <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground/60">
         <div className="hidden sm:flex flex-wrap justify-center gap-x-4">
-          <span>키보드: ↓ 뒤집기 · ↑ 어려움 · → 쉬움 · ← 이전 · ★ 취약</span>
+          <span>키보드: → 다음 · ← 이전 · ↓ 뒤집기 · ↑ 어려움</span>
         </div>
         <div className="hidden sm:flex flex-wrap justify-center gap-x-4">
-          <span>마우스: 클릭 뒤집기 · 휠 다음/이전 · 휠클릭 어려움</span>
+          <span>마우스: 휠 아래 다음 · 휠 위 이전 · 클릭 뒤집기 · 휠클릭 어려움 · ★ 취약</span>
         </div>
         <div className="sm:hidden flex flex-wrap justify-center gap-x-4">
           <span>탭 뒤집기 · 길게 취약</span>

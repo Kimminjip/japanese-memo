@@ -2,8 +2,13 @@ import { Router, type IRouter } from "express";
 
 const router: IRouter = Router();
 
+const VOICES: Record<string, { languageCode: string; name: string }> = {
+  ja: { languageCode: "ja-JP", name: "ja-JP-Neural2-B" },
+  ko: { languageCode: "ko-KR", name: "ko-KR-Neural2-A" },
+};
+
 router.post("/tts", async (req, res): Promise<void> => {
-  const { text } = req.body;
+  const { text, lang } = req.body;
   if (!text || typeof text !== "string") {
     res.status(400).json({ error: "text is required" });
     return;
@@ -15,6 +20,8 @@ router.post("/tts", async (req, res): Promise<void> => {
     return;
   }
 
+  const voice = VOICES[lang] ?? VOICES.ja;
+
   const response = await fetch(
     `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
     {
@@ -22,7 +29,7 @@ router.post("/tts", async (req, res): Promise<void> => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: { text },
-        voice: { languageCode: "ja-JP", name: "ja-JP-Neural2-B" },
+        voice,
         audioConfig: { audioEncoding: "MP3" },
       }),
     }

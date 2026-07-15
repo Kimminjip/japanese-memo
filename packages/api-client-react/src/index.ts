@@ -273,8 +273,9 @@ export function useRecordActivity() {
 export function useSpeakJapanese() {
   const ctxRef = { current: null as AudioContext | null };
 
-  return async (text: string): Promise<void> => {
-    const res = await api.post<{ audioContent: string }>("/tts", { text });
+  // lang: "ja" (기본) 또는 "ko". 재생이 끝나면 resolve되어 순차 재생에 사용 가능.
+  return async (text: string, lang: "ja" | "ko" = "ja"): Promise<void> => {
+    const res = await api.post<{ audioContent: string }>("/tts", { text, lang });
     if (ctxRef.current) ctxRef.current.close();
     const ctx = new AudioContext();
     ctxRef.current = ctx;
@@ -285,7 +286,10 @@ export function useSpeakJapanese() {
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(ctx.destination);
-    source.start(0);
+    return new Promise<void>((resolve) => {
+      source.onended = () => resolve();
+      source.start(0);
+    });
   };
 }
 
