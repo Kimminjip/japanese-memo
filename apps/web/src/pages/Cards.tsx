@@ -169,13 +169,19 @@ function CardListItem({
       </div>
       {/* 오늘 학습 버튼 */}
       <button
+        type="button"
         className={cn(
           "absolute bottom-2 right-2 z-20 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
           item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString()
             ? "bg-primary/10 text-primary opacity-100"
             : "bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
         )}
-        onClick={(e) => { e.stopPropagation(); handleMarkStudied(); }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          (e.currentTarget as HTMLButtonElement).blur();
+          handleMarkStudied();
+        }}
         onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleMarkStudied(); }}
         title="오늘 학습으로 기록"
       >

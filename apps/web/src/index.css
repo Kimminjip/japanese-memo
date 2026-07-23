@@ -2,24 +2,24 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
-/* JapaneseSerif alias — Noto Serif JP를 브라우저 캐시에서 참조 (index.html에서 Google Fonts로 로드) */
+/* JapaneseSerif alias — JLPT 지문 스타일(고딕)의 Noto Sans JP를 브라우저 캐시에서 참조 (index.html에서 Google Fonts로 로드) */
 @font-face {
   font-family: 'JapaneseSerif';
-  src: local('Noto Serif JP'), local('NotoSerifJP');
+  src: local('Noto Sans JP'), local('NotoSansJP');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JapaneseSerif';
-  src: local('Noto Serif JP Medium'), local('NotoSerifJP-Medium');
+  src: local('Noto Sans JP Medium'), local('NotoSansJP-Medium');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JapaneseSerif';
-  src: local('Noto Serif JP Bold'), local('NotoSerifJP-Bold');
+  src: local('Noto Sans JP Bold'), local('NotoSansJP-Bold');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -128,7 +128,7 @@
   --chart-5: 45 80% 55%;
 
   --app-font-sans: 'Inter', system-ui, sans-serif;
-  --app-font-serif: 'JapaneseSerif', 'Noto Serif JP', 'Shippori Mincho', Georgia, serif;
+  --app-font-serif: 'JapaneseSerif', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
   --app-font-mono: ui-monospace, monospace;
   --radius: 0.75rem;
 

@@ -82,10 +82,18 @@ export default function Quiz() {
     if (quizType !== "weak") {
       if (cardRange === "today") {
         const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-        sourceItems = sourceItems.filter(item => new Date(item.createdAt ?? item.created_at ?? "").getTime() >= twoDaysAgo);
+        sourceItems = sourceItems.filter(item => {
+          const created = new Date(item.createdAt ?? item.created_at ?? "").getTime();
+          const studied = item.studiedAt ? new Date(item.studiedAt).getTime() : 0;
+          return created >= twoDaysAgo || studied >= twoDaysAgo;
+        });
       } else if (cardRange === "recent") {
         const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        sourceItems = sourceItems.filter(item => new Date(item.createdAt ?? item.created_at ?? "").getTime() >= oneWeekAgo);
+        sourceItems = sourceItems.filter(item => {
+          const created = new Date(item.createdAt ?? item.created_at ?? "").getTime();
+          const studied = item.studiedAt ? new Date(item.studiedAt).getTime() : 0;
+          return created >= oneWeekAgo || studied >= oneWeekAgo;
+        });
       }
     }
 
