@@ -113,9 +113,12 @@ export default function Quiz() {
 
       const splitLines = (s: string) => s.split("\n").map(l => l.trim()).filter(Boolean);
       const pickOne = (s: string) => { const lines = splitLines(s); return lines[Math.floor(Math.random() * lines.length)] || s; };
+      // AI가 미리 만들어 둔 그럴듯한 오답 보기 (있으면 우선 사용)
+      let aiDistractors: string[] = [];
       if (item.type === "word") {
         correctAnswer = pickOne(item.korean);
         questionText = item.japanese;
+        aiDistractors = Array.isArray(item.distractors) ? item.distractors : [];
         allPossibleWrong = words ? words.filter(w => w.id !== item.id).map(w => pickOne(w.korean)) : [];
       } else {
         const hasOnyomi = item.onyomi.trim().length > 0;
@@ -124,17 +127,23 @@ export default function Quiz() {
         questionLabel = askOnyomi ? "음독을 고르세요" : "훈독을 고르세요";
         correctAnswer = askOnyomi ? pickOne(item.onyomi) : pickOne(item.kunyomi);
         questionText = item.character;
+        aiDistractors = Array.isArray(item.distractors) ? item.distractors : [];
         allPossibleWrong = kanji
           ? kanji.filter(k => k.id !== item.id && (askOnyomi ? k.onyomi.trim().length > 0 : k.kunyomi.trim().length > 0))
               .map(k => askOnyomi ? pickOne(k.onyomi) : pickOne(k.kunyomi))
           : [];
       }
 
-      if (allPossibleWrong.length < 3) {
-        allPossibleWrong.push("테스트 오답 1", "테스트 오답 2", "테스트 오답 3");
+      // 정답과 겹치는 오답 제거
+      const dedupe = (arr: string[]) => arr.filter(a => a && a !== correctAnswer);
+      // AI 오답 우선, 부족하면 다른 카드에서 무작위로 채움
+      const aiPool = [...new Set(dedupe(aiDistractors))].sort(() => 0.5 - Math.random());
+      const randomPool = [...new Set(dedupe(allPossibleWrong))].sort(() => 0.5 - Math.random());
+      let wrongAnswers = [...aiPool, ...randomPool.filter(r => !aiPool.includes(r))].slice(0, 3);
+      while (wrongAnswers.length < 3) {
+        wrongAnswers.push(`오답 ${wrongAnswers.length + 1}`);
       }
 
-      const wrongAnswers = [...allPossibleWrong].sort(() => 0.5 - Math.random()).slice(0, 3);
       const options = [correctAnswer, ...wrongAnswers].sort(() => 0.5 - Math.random());
 
       return {

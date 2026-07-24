@@ -31,6 +31,7 @@ export interface Word {
   createdAt: string;
   studiedAt: string | null;
   jlptLevel: string | null;
+  distractors?: string[] | null;
 }
 
 export interface Kanji {
@@ -44,6 +45,7 @@ export interface Kanji {
   createdAt: string;
   studiedAt: string | null;
   jlptLevel: string | null;
+  distractors?: string[] | null;
 }
 
 export interface StatsSummary {

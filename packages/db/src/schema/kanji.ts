@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,8 +13,9 @@ export const kanjiTable = pgTable("kanji", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   studiedAt: timestamp("studied_at"),
   jlptLevel: text("jlpt_level"),
+  distractors: jsonb("distractors").$type<string[]>(),
 }, (table) => [uniqueIndex("kanji_character_unique").on(table.character)]);
 
-export const insertKanjiSchema = createInsertSchema(kanjiTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true });
+export const insertKanjiSchema = createInsertSchema(kanjiTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true, distractors: true });
 export type InsertKanji = z.infer<typeof insertKanjiSchema>;
 export type Kanji = typeof kanjiTable.$inferSelect;

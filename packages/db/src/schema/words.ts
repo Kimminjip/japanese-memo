@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -12,8 +12,9 @@ export const wordsTable = pgTable("words", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   studiedAt: timestamp("studied_at"),
   jlptLevel: text("jlpt_level"),
+  distractors: jsonb("distractors").$type<string[]>(),
 }, (table) => [uniqueIndex("words_japanese_unique").on(table.japanese)]);
 
-export const insertWordSchema = createInsertSchema(wordsTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true });
+export const insertWordSchema = createInsertSchema(wordsTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true, distractors: true });
 export type InsertWord = z.infer<typeof insertWordSchema>;
 export type Word = typeof wordsTable.$inferSelect;

@@ -1,18 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropic } from "./anthropic";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"];
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  if (!client) client = new Anthropic({ apiKey });
-  return client;
-}
-
 // 단어/한자 하나의 JLPT 급수를 판별. 실패하거나 API 키가 없으면 null (카드 생성은 막지 않음)
 export async function classifyJlptLevel(type: "word" | "kanji", text: string): Promise<string | null> {
-  const c = getClient();
+  const c = getAnthropic();
   if (!c || !text) return null;
 
   const prompt = type === "word"

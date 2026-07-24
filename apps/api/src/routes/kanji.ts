@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, gte, desc, sql, or } from "drizzle-orm";
 import { db, kanjiTable } from "@workspace/db";
 import { classifyJlptLevel } from "../lib/jlpt";
+import { generateKanjiDistractors } from "../lib/distractors";
 import {
   ListKanjiQueryParams,
   ListKanjiResponse,
@@ -51,13 +52,17 @@ router.post("/kanji", async (req, res): Promise<void> => {
   }
 
   try {
-    const jlptLevel = await classifyJlptLevel("kanji", parsed.data.character);
+    const [jlptLevel, distractors] = await Promise.all([
+      classifyJlptLevel("kanji", parsed.data.character),
+      generateKanjiDistractors(parsed.data.character, parsed.data.onyomi, parsed.data.kunyomi),
+    ]);
     const [kanji] = await db.insert(kanjiTable).values({
       character: parsed.data.character,
       onyomi: parsed.data.onyomi,
       kunyomi: parsed.data.kunyomi,
       korean: parsed.data.korean ?? "",
       jlptLevel,
+      distractors: distractors.length ? distractors : null,
     }).returning();
     res.status(201).json(GetKanjiResponse.parse(kanji));
   } catch (err: any) {
