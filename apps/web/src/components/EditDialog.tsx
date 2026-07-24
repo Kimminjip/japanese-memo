@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  useUpdateWord, useUpdateKanji,
-  getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey,
+  useUpdateWord, useUpdateKanji, useUpdateGrammar,
+  getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, getGetStatsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { X, Plus, Keyboard, Trash2 } from "lucide-react";
@@ -13,7 +13,8 @@ import { VirtualKeyboard } from "@/components/VirtualKeyboard";
 
 export type EditTarget =
   | { cardType: "word"; id: number; japanese: string; furigana: string | null; korean: string }
-  | { cardType: "kanji"; id: number; character: string; onyomi: string; kunyomi: string; korean: string };
+  | { cardType: "kanji"; id: number; character: string; onyomi: string; kunyomi: string; korean: string }
+  | { cardType: "grammar"; id: number; pattern: string; meaning: string; formation: string; example: string; exampleKorean: string; exampleHighlight: string | null };
 
 type ActiveField =
   | { kind: "japanese" }
@@ -30,6 +31,14 @@ export function EditDialog({
   const queryClient = useQueryClient();
   const updateWord = useUpdateWord();
   const updateKanji = useUpdateKanji();
+  const updateGrammar = useUpdateGrammar();
+
+  const [gPattern, setGPattern] = useState(target.cardType === "grammar" ? target.pattern : "");
+  const [gMeaning, setGMeaning] = useState(target.cardType === "grammar" ? target.meaning : "");
+  const [gFormation, setGFormation] = useState(target.cardType === "grammar" ? target.formation : "");
+  const [gExample, setGExample] = useState(target.cardType === "grammar" ? target.example : "");
+  const [gExampleKorean, setGExampleKorean] = useState(target.cardType === "grammar" ? target.exampleKorean : "");
+  const [gHighlight, setGHighlight] = useState(target.cardType === "grammar" ? (target.exampleHighlight ?? "") : "");
 
   const [japanese, setJapanese] = useState(target.cardType === "word" ? target.japanese : "");
   const [furigana, setFurigana] = useState(target.cardType === "word" ? (target.furigana ?? "") : "");
@@ -140,6 +149,20 @@ export function EditDialog({
   };
 
   const handleSave = () => {
+    if (target.cardType === "grammar") {
+      if (!gPattern.trim() || !gMeaning.trim()) { toast({ title: "문형과 의미는 필수입니다.", variant: "destructive" }); return; }
+      updateGrammar.mutate({ id: target.id, data: {
+        pattern: gPattern.trim(), meaning: gMeaning.trim(), formation: gFormation.trim(),
+        example: gExample.trim(), exampleKorean: gExampleKorean.trim(), exampleHighlight: gHighlight.trim() || null,
+      } }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListGrammarQueryKey() });
+          toast({ title: "수정되었습니다." });
+          onClose();
+        },
+      });
+      return;
+    }
     if (target.cardType === "word") {
       const nonEmpty = koreanMeanings.map(m => m.trim()).filter(Boolean);
       if (!japanese.trim()) { toast({ title: "일본어를 입력해주세요.", variant: "destructive" }); return; }
@@ -167,7 +190,7 @@ export function EditDialog({
     }
   };
 
-  const isPending = updateWord.isPending || updateKanji.isPending;
+  const isPending = updateWord.isPending || updateKanji.isPending || updateGrammar.isPending;
 
   return createPortal(
     <>
@@ -178,7 +201,7 @@ export function EditDialog({
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">
-            {target.cardType === "word" ? "단어 수정" : "한자 수정"}
+            {target.cardType === "word" ? "단어 수정" : target.cardType === "kanji" ? "한자 수정" : "문법 수정"}
           </h2>
           <button className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -186,7 +209,28 @@ export function EditDialog({
         </div>
 
         <div className="space-y-4 py-2">
-          {target.cardType === "word" ? (
+          {target.cardType === "grammar" ? (
+            <>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">문형</label>
+                <Input className="text-2xl h-14 font-serif" value={gPattern} onChange={e => setGPattern(e.target.value)} lang="ja" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">의미</label>
+                <Input className="text-xl h-12" value={gMeaning} onChange={e => setGMeaning(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium flex justify-between"><span>접속</span><span className="text-muted-foreground text-xs font-normal">(선택)</span></label>
+                <Input className="text-lg h-11 font-serif" value={gFormation} onChange={e => setGFormation(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium flex justify-between"><span>예문</span><span className="text-muted-foreground text-xs font-normal">(선택)</span></label>
+                <Input className="text-lg h-11 font-serif" value={gExample} onChange={e => setGExample(e.target.value)} lang="ja" />
+                <Input className="text-base h-10" placeholder="예문 해석" value={gExampleKorean} onChange={e => setGExampleKorean(e.target.value)} />
+                <Input className="text-base h-10 font-serif" placeholder="밑줄 칠 부분 (예: たばかり)" value={gHighlight} onChange={e => setGHighlight(e.target.value)} lang="ja" />
+              </div>
+            </>
+          ) : target.cardType === "word" ? (
             <>
               <div className="space-y-1">
                 <label className="text-sm font-medium">일본어 단어</label>

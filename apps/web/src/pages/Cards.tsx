@@ -168,18 +168,16 @@ function CardListItem({
           onSpeak={item.example ? () => speakJapanese(item.example) : undefined}
         />
       )}
-      {item.cardType !== "grammar" && (
-        <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-          <Button
-            variant="secondary"
-            size="icon"
-            className="shadow-sm"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+      <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+        <Button
+          variant="secondary"
+          size="icon"
+          className="shadow-sm"
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </div>
       {/* 오늘 학습 버튼 */}
       <button
         type="button"
@@ -271,8 +269,10 @@ export default function Cards() {
   const handleEdit = (item: typeof allCards[number]) => {
     if (item.cardType === "word") {
       setEditTarget({ cardType: "word", id: item.id, japanese: item.japanese, furigana: item.furigana ?? null, korean: item.korean });
-    } else {
+    } else if (item.cardType === "kanji") {
       setEditTarget({ cardType: "kanji", id: item.id, character: item.character, onyomi: item.onyomi, kunyomi: item.kunyomi, korean: item.korean });
+    } else {
+      setEditTarget({ cardType: "grammar", id: item.id, pattern: item.pattern, meaning: item.meaning, formation: item.formation, example: item.example, exampleKorean: item.exampleKorean, exampleHighlight: item.exampleHighlight });
     }
   };
 

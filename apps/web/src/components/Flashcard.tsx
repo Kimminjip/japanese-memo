@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import { Star, Pencil, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,17 +26,30 @@ interface FlashcardProps {
   onSpeak?: () => void;
 }
 
-// 예문에서 문형 부분에 밑줄
-function renderHighlighted(example: string, highlight?: string | null) {
+// 예문에서 highlight 영역 전체에 밑줄, 그 안에서 문형(pattern) 부분만 굵게
+function renderHighlighted(example: string, highlight?: string | null, pattern?: string) {
   if (!highlight || !example.includes(highlight)) return example;
   const idx = example.indexOf(highlight);
-  return (
-    <>
-      {example.slice(0, idx)}
-      <span className="underline decoration-primary decoration-2 underline-offset-4 font-semibold">{highlight}</span>
-      {example.slice(idx + highlight.length)}
-    </>
-  );
+  const before = example.slice(0, idx);
+  const after = example.slice(idx + highlight.length);
+  const underlineCls = "underline decoration-primary decoration-2 underline-offset-4";
+
+  // 문형에서 물결(〜/～/~) 등 장식 제거 → 핵심 표현
+  const core = (pattern ?? "").replace(/[〜～~\s]/g, "").trim();
+  let inner: ReactNode;
+  if (core && highlight.includes(core)) {
+    const ci = highlight.indexOf(core);
+    inner = (
+      <span className={underlineCls}>
+        {highlight.slice(0, ci)}
+        <span className="font-bold">{core}</span>
+        {highlight.slice(ci + core.length)}
+      </span>
+    );
+  } else {
+    inner = <span className={cn(underlineCls, "font-bold")}>{highlight}</span>;
+  }
+  return <>{before}{inner}{after}</>;
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -226,12 +239,12 @@ export function Flashcard({
                 </div>
               )}
               {example && (
-                <div className="flex flex-col gap-0.5 pt-1 border-t border-border/50">
-                  <span className="font-serif text-lg sm:text-xl text-foreground break-keep leading-relaxed">
-                    {renderHighlighted(example, exampleHighlight)}
+                <div className="flex flex-col gap-0.5 pt-1 border-t border-border/50 w-full">
+                  <span className="font-serif text-lg sm:text-xl text-foreground leading-relaxed break-words whitespace-normal">
+                    {renderHighlighted(example, exampleHighlight, japanese)}
                   </span>
                   {exampleKorean && (
-                    <span className="text-sm text-muted-foreground break-keep">{exampleKorean}</span>
+                    <span className="text-sm text-muted-foreground break-words whitespace-normal">{exampleKorean}</span>
                   )}
                 </div>
               )}
