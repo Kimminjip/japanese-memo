@@ -3,12 +3,12 @@ import { useListWords, useListKanji, useRecordWordWrong, useRecordKanjiWrong, us
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Check, X, RotateCcw, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type QuizState = "setup" | "playing" | "results";
-type QuizType = "words" | "kanji" | "both" | "weak" | "kanji-writing";
 type CardRange = "today" | "recent" | "all";
 
 interface Question {
@@ -23,7 +23,10 @@ interface Question {
 
 export default function Quiz() {
   const [state, setState] = useState<QuizState>("setup");
-  const [quizType, setQuizType] = useState<QuizType>("both");
+  const [includeWords, setIncludeWords] = useState(true);
+  const [includeKanji, setIncludeKanji] = useState(true);
+  const [writingMode, setWritingMode] = useState(false); // 한자를 표기 문제로
+  const [weakOnly, setWeakOnly] = useState(false);
   const [cardRange, setCardRange] = useState<CardRange>("all");
   const [count, setCount] = useState("10");
   
@@ -64,27 +67,28 @@ export default function Quiz() {
   }, [isCorrect]);
 
   const handleStart = () => {
+    if (!includeWords && !includeKanji) {
+      alert("단어 또는 한자 중 하나 이상 선택해주세요.");
+      return;
+    }
+    const kanjiType = writingMode ? "kanji-writing" : "kanji";
     let sourceItems: any[] = [];
-    
-    if (quizType === "weak" && weakItems) {
-      sourceItems = [
-        ...weakItems.words.map(w => ({ ...w, type: "word" })),
-        ...weakItems.kanji.map(k => ({ ...k, type: "kanji" }))
-      ];
+
+    if (weakOnly && weakItems) {
+      if (includeWords) sourceItems.push(...weakItems.words.map(w => ({ ...w, type: "word" })));
+      if (includeKanji) sourceItems.push(...weakItems.kanji.map(k => ({ ...k, type: kanjiType })));
     } else {
-      if ((quizType === "words" || quizType === "both") && words) {
+      if (includeWords && words) {
         sourceItems.push(...words.map(w => ({ ...w, type: "word" })));
       }
-      if ((quizType === "kanji" || quizType === "both") && kanji) {
-        sourceItems.push(...kanji.map(k => ({ ...k, type: "kanji" })));
-      }
-      if (quizType === "kanji-writing" && kanji) {
-        // 표기 문제: 뜻·읽기 → 한자 고르기 (한글 뜻음이 있는 한자만)
-        sourceItems.push(...kanji.filter(k => (k.korean ?? "").trim().length > 0).map(k => ({ ...k, type: "kanji-writing" })));
+      if (includeKanji && kanji) {
+        // 표기 문제는 한글 뜻음이 있는 한자만
+        const src = kanjiType === "kanji-writing" ? kanji.filter(k => (k.korean ?? "").trim().length > 0) : kanji;
+        sourceItems.push(...src.map(k => ({ ...k, type: kanjiType })));
       }
     }
 
-    if (quizType !== "weak") {
+    if (!weakOnly) {
       if (cardRange === "today") {
         const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
         sourceItems = sourceItems.filter(item => {
@@ -234,29 +238,31 @@ export default function Quiz() {
           </CardHeader>
           <CardContent className="space-y-8">
             <div className="space-y-3">
-              <Label className="text-base font-semibold">학습 유형</Label>
-              <RadioGroup value={quizType} onValueChange={(v) => setQuizType(v as QuizType)} className="flex flex-col space-y-2">
+              <Label className="text-base font-semibold">학습 유형 <span className="text-xs font-normal text-muted-foreground">(중복 선택)</span></Label>
+              <div className="flex flex-col space-y-2">
                 <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="both" id="q-both" />
-                  <Label htmlFor="q-both" className="text-base font-normal">혼합</Label>
+                  <Checkbox id="q-words" checked={includeWords} onCheckedChange={() => setIncludeWords(v => !v)} />
+                  <Label htmlFor="q-words" className="text-base font-normal cursor-pointer">단어</Label>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="words" id="q-words" />
-                  <Label htmlFor="q-words" className="text-base font-normal">단어만</Label>
+                  <Checkbox id="q-kanji" checked={includeKanji} onCheckedChange={() => setIncludeKanji(v => !v)} />
+                  <Label htmlFor="q-kanji" className="text-base font-normal cursor-pointer">한자</Label>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="kanji" id="q-kanji" />
-                  <Label htmlFor="q-kanji" className="text-base font-normal">한자만 (읽기 맞히기)</Label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="kanji-writing" id="q-kanji-writing" />
-                  <Label htmlFor="q-kanji-writing" className="text-base font-normal">한자 표기 (뜻·읽기 → 한자 고르기)</Label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="weak" id="q-weak" />
-                  <Label htmlFor="q-weak" className="text-base font-normal text-destructive">취약 항목만 (3번 이상 틀린 항목)</Label>
-                </div>
-              </RadioGroup>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">옵션</Label>
+              <div className="flex flex-col space-y-2">
+                <label className={cn("flex items-center space-x-3", !includeKanji && "opacity-40")}>
+                  <Checkbox id="q-writing" checked={writingMode} disabled={!includeKanji} onCheckedChange={() => setWritingMode(v => !v)} />
+                  <span className="text-base font-normal cursor-pointer">한자를 표기 문제로 (뜻·읽기 → 한자 고르기)</span>
+                </label>
+                <label className="flex items-center space-x-3">
+                  <Checkbox id="q-weak" checked={weakOnly} onCheckedChange={() => setWeakOnly(v => !v)} />
+                  <span className="text-base font-normal text-destructive cursor-pointer">취약 항목만 (3번 이상 틀린 항목)</span>
+                </label>
+              </div>
             </div>
 
             <div className="space-y-3">

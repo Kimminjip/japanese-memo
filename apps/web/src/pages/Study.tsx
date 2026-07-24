@@ -27,6 +27,8 @@ import { EditDialog, EditTarget } from "@/components/EditDialog";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause } from "lucide-react";
 import { Link, useSearch } from "wouter";
@@ -34,9 +36,11 @@ import { useToast } from "@/hooks/use-toast";
 
 const WEAK_THRESHOLD = 3;
 
-type StudyType = "both" | "words" | "kanji" | "grammar";
 type CardRange = "today" | "recent" | "all";
 type OrderMode = "random" | "sequence";
+interface StudyInclude { words: boolean; kanji: boolean; grammar: boolean }
+interface GrammarLevels { N5: boolean; N4: boolean; N3: boolean }
+const GRAMMAR_LEVEL_KEYS: (keyof GrammarLevels)[] = ["N5", "N4", "N3"];
 type AnimPhase = "idle" | "exit-left" | "exit-right" | "exit-up" | "enter-right" | "enter-left" | "enter-down" | "cover-left";
 
 interface StudyCard {
@@ -56,9 +60,25 @@ interface StudyCard {
   jlptLevel?: string | null;
 }
 
-const STORAGE_KEY_TYPE = "study_type";
+const STORAGE_KEY_INCLUDE = "study_include";
+const STORAGE_KEY_GRAMMAR_LEVELS = "study_grammar_levels";
 const STORAGE_KEY_RANGE = "study_range";
 const STORAGE_KEY_ORDER = "study_order";
+
+function loadInclude(): StudyInclude {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_INCLUDE);
+    if (raw) { const p = JSON.parse(raw); return { words: !!p.words, kanji: !!p.kanji, grammar: !!p.grammar }; }
+  } catch {}
+  return { words: true, kanji: true, grammar: false };
+}
+function loadGrammarLevels(): GrammarLevels {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_GRAMMAR_LEVELS);
+    if (raw) { const p = JSON.parse(raw); return { N5: !!p.N5, N4: !!p.N4, N3: !!p.N3 }; }
+  } catch {}
+  return { N5: true, N4: true, N3: true };
+}
 const SESSION_KEY = "study_session";
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -68,7 +88,8 @@ interface StudySession {
   history: number[];
   remaining: number[];
   studyStep: number;
-  studyType: StudyType;
+  studyInclude: StudyInclude;
+  grammarLevels: GrammarLevels;
   cardRange: CardRange;
   orderMode?: OrderMode;
   savedAt: number;
@@ -122,20 +143,27 @@ function loadDeck(
   words: any[] | undefined,
   kanji: any[] | undefined,
   grammar: any[] | undefined,
-  studyType: StudyType,
+  include: StudyInclude,
+  grammarLevels: GrammarLevels,
   cardRange: CardRange,
   orderMode: OrderMode
 ): StudyCard[] {
   let items: (StudyCard & { _createdAt?: string; _studiedAt?: string | null })[] = [];
 
-  if (studyType === "grammar") {
-    items.push(...(grammar ?? []).map(g => ({ ...buildCardFromGrammar(g), _createdAt: g.createdAt, _studiedAt: g.studiedAt })));
-  }
-  if (studyType === "words" || studyType === "both") {
+  if (include.words) {
     items.push(...(words ?? []).map(w => ({ ...buildCardFromWord(w), _createdAt: w.createdAt, _studiedAt: w.studiedAt })));
   }
-  if (studyType === "kanji" || studyType === "both") {
+  if (include.kanji) {
     items.push(...(kanji ?? []).map(k => ({ ...buildCardFromKanji(k), _createdAt: k.createdAt, _studiedAt: k.studiedAt })));
+  }
+  if (include.grammar) {
+    const g = (grammar ?? []).filter(x => {
+      const lv = x.jlptLevel as keyof GrammarLevels | null;
+      // 급수가 N5/N4/N3면 해당 급수 체크 여부, 그 외/미분류는 항상 포함
+      if (lv && GRAMMAR_LEVEL_KEYS.includes(lv)) return grammarLevels[lv];
+      return true;
+    });
+    items.push(...g.map(x => ({ ...buildCardFromGrammar(x), _createdAt: x.createdAt, _studiedAt: x.studiedAt })));
   }
 
   if (cardRange === "today") {
@@ -173,15 +201,25 @@ function loadDeckWeak(
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
 }
 
+function sameInclude(a: StudyInclude, b: StudyInclude) {
+  return a.words === b.words && a.kanji === b.kanji && a.grammar === b.grammar;
+}
+function sameLevels(a: GrammarLevels, b: GrammarLevels) {
+  return a.N5 === b.N5 && a.N4 === b.N4 && a.N3 === b.N3;
+}
+
 function tryRestoreSession(
   session: StudySession,
   words: any[] | undefined,
   kanji: any[] | undefined,
   grammar: any[] | undefined,
-  studyType: StudyType,
+  include: StudyInclude,
+  grammarLevels: GrammarLevels,
   cardRange: CardRange,
 ): { deck: StudyCard[]; currentIdx: number; history: number[]; remaining: number[]; studyStep: number } | null {
-  if (session.studyType !== studyType || session.cardRange !== cardRange) return null;
+  if (!session.studyInclude || !sameInclude(session.studyInclude, include)) return null;
+  if (!session.grammarLevels || !sameLevels(session.grammarLevels, grammarLevels)) return null;
+  if (session.cardRange !== cardRange) return null;
 
   const wordMap = new Map((words ?? []).map(w => [w.id, w]));
   const kanjiMap = new Map((kanji ?? []).map(k => [k.id, k]));
@@ -211,9 +249,8 @@ export default function Study() {
   const weakMode = new URLSearchParams(search).get("weak") === "true";
   const { toast } = useToast();
 
-  const [studyType, setStudyType] = useState<StudyType>(
-    () => (localStorage.getItem(STORAGE_KEY_TYPE) as StudyType | null) ?? "both"
-  );
+  const [include, setInclude] = useState<StudyInclude>(loadInclude);
+  const [grammarLevels, setGrammarLevels] = useState<GrammarLevels>(loadGrammarLevels);
   const [cardRange, setCardRange] = useState<CardRange>(
     () => (localStorage.getItem(STORAGE_KEY_RANGE) as CardRange | null) ?? "all"
   );
@@ -260,13 +297,15 @@ export default function Study() {
   const wordsRef = useRef(words);
   const kanjiRef = useRef(kanji);
   const grammarRef = useRef(grammar);
-  const studyTypeRef = useRef(studyType);
+  const includeRef = useRef(include);
+  const grammarLevelsRef = useRef(grammarLevels);
   const cardRangeRef = useRef(cardRange);
   const orderModeRef = useRef(orderMode);
   wordsRef.current = words;
   kanjiRef.current = kanji;
   grammarRef.current = grammar;
-  studyTypeRef.current = studyType;
+  includeRef.current = include;
+  grammarLevelsRef.current = grammarLevels;
   cardRangeRef.current = cardRange;
   orderModeRef.current = orderMode;
 
@@ -284,7 +323,7 @@ export default function Study() {
 
   // 세션 저장 — localStorage + 서버 (debounced 800ms)
   const persistSession = useCallback((
-    d: StudyCard[], idx: number, hist: number[], rem: number[], step: number, st: StudyType, cr: CardRange
+    d: StudyCard[], idx: number, hist: number[], rem: number[], step: number, cr: CardRange
   ) => {
     if (weakMode || d.length === 0) return;
     const session: StudySession = {
@@ -293,7 +332,8 @@ export default function Study() {
       history: hist,
       remaining: rem,
       studyStep: step,
-      studyType: st,
+      studyInclude: includeRef.current,
+      grammarLevels: grammarLevelsRef.current,
       cardRange: cr,
       orderMode: orderModeRef.current,
       savedAt: Date.now(),
@@ -384,10 +424,15 @@ export default function Study() {
 
       if (sessionToUse) {
         // 세션의 설정값을 로컬 설정에 반영 (크로스-디바이스 동기화)
-        if (sessionToUse.studyType !== studyTypeRef.current) {
-          setStudyType(sessionToUse.studyType);
-          localStorage.setItem(STORAGE_KEY_TYPE, sessionToUse.studyType);
-          studyTypeRef.current = sessionToUse.studyType;
+        if (sessionToUse.studyInclude) {
+          setInclude(sessionToUse.studyInclude);
+          localStorage.setItem(STORAGE_KEY_INCLUDE, JSON.stringify(sessionToUse.studyInclude));
+          includeRef.current = sessionToUse.studyInclude;
+        }
+        if (sessionToUse.grammarLevels) {
+          setGrammarLevels(sessionToUse.grammarLevels);
+          localStorage.setItem(STORAGE_KEY_GRAMMAR_LEVELS, JSON.stringify(sessionToUse.grammarLevels));
+          grammarLevelsRef.current = sessionToUse.grammarLevels;
         }
         if (sessionToUse.cardRange !== cardRangeRef.current) {
           setCardRange(sessionToUse.cardRange);
@@ -402,7 +447,7 @@ export default function Study() {
 
         const restored = tryRestoreSession(
           sessionToUse, words, kanji, grammar,
-          sessionToUse.studyType, sessionToUse.cardRange
+          includeRef.current, grammarLevelsRef.current, sessionToUse.cardRange
         );
         if (restored) {
           setDeck(restored.deck);
@@ -426,7 +471,7 @@ export default function Study() {
     if (deckKey === 0) return;
     const newDeck = weakMode
       ? loadDeckWeak(wordsRef.current, kanjiRef.current)
-      : loadDeck(wordsRef.current, kanjiRef.current, grammarRef.current, studyTypeRef.current, cardRangeRef.current, orderModeRef.current);
+      : loadDeck(wordsRef.current, kanjiRef.current, grammarRef.current, includeRef.current, grammarLevelsRef.current, cardRangeRef.current, orderModeRef.current);
     setDeck(newDeck);
     setCurrentIdx(0);
     setHistory([]);
@@ -434,15 +479,35 @@ export default function Study() {
     setStudyStep(1);
     setIsFlipped(false);
     if (!weakMode) {
-      persistSession(newDeck, 0, [], buildRemaining(newDeck.length), 1, studyTypeRef.current, cardRangeRef.current);
+      persistSession(newDeck, 0, [], buildRemaining(newDeck.length), 1, cardRangeRef.current);
     }
   }, [deckKey, weakMode, persistSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleTypeChange = (v: StudyType) => {
-    setStudyType(v);
-    localStorage.setItem(STORAGE_KEY_TYPE, v);
-    clearSessionAll();
-    setDeckKey(k => k + 1);
+  const handleIncludeChange = (key: keyof StudyInclude) => {
+    setInclude(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      // 최소 하나는 선택 유지
+      if (!next.words && !next.kanji && !next.grammar) return prev;
+      localStorage.setItem(STORAGE_KEY_INCLUDE, JSON.stringify(next));
+      includeRef.current = next;
+      clearSessionAll();
+      setDeckKey(k => k + 1);
+      return next;
+    });
+  };
+
+  const handleGrammarLevelChange = (key: keyof GrammarLevels) => {
+    setGrammarLevels(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem(STORAGE_KEY_GRAMMAR_LEVELS, JSON.stringify(next));
+      grammarLevelsRef.current = next;
+      // 문법이 포함돼 있을 때만 덱에 영향
+      if (includeRef.current.grammar) {
+        clearSessionAll();
+        setDeckKey(k => k + 1);
+      }
+      return next;
+    });
   };
 
   const handleRangeChange = (v: CardRange) => {
@@ -475,7 +540,7 @@ export default function Study() {
         setHistory([]);
         setStudyStep(1);
         setCurrentIdx(0);
-        persistSession(deck, 0, [], newRem, 1, studyTypeRef.current, cardRangeRef.current);
+        persistSession(deck, 0, [], newRem, 1, cardRangeRef.current);
         return newRem;
       }
       const next = rem[0];
@@ -487,7 +552,7 @@ export default function Study() {
           const newHist = [...h, currentIdx];
           setCurrentIdx(next);
           setDeck(d => {
-            persistSession(d, next, newHist, newRem, newStep, studyTypeRef.current, cardRangeRef.current);
+            persistSession(d, next, newHist, newRem, newStep, cardRangeRef.current);
             return d;
           });
           return newHist;
@@ -510,7 +575,7 @@ export default function Study() {
           const newStep = Math.max(1, s - 1);
           setCurrentIdx(last);
           setDeck(d => {
-            persistSession(d, last, newHist, newRem, newStep, studyTypeRef.current, cardRangeRef.current);
+            persistSession(d, last, newHist, newRem, newStep, cardRangeRef.current);
             return d;
           });
           return newStep;
@@ -783,10 +848,12 @@ export default function Study() {
               </SheetTrigger>
               <SheetContent side="left" className="w-72">
                 <SettingsPanel
-                  studyType={studyType}
+                  include={include}
+                  grammarLevels={grammarLevels}
                   cardRange={cardRange}
                   orderMode={orderMode}
-                  onTypeChange={handleTypeChange}
+                  onIncludeChange={handleIncludeChange}
+                  onGrammarLevelChange={handleGrammarLevelChange}
                   onRangeChange={handleRangeChange}
                   onOrderChange={handleOrderChange}
                   onReshuffle={handleReshuffle}
@@ -829,10 +896,12 @@ export default function Study() {
             </SheetTrigger>
             <SheetContent side="left" className="w-72">
               <SettingsPanel
-                studyType={studyType}
+                include={include}
+                grammarLevels={grammarLevels}
                 cardRange={cardRange}
                 orderMode={orderMode}
-                onTypeChange={handleTypeChange}
+                onIncludeChange={handleIncludeChange}
+                onGrammarLevelChange={handleGrammarLevelChange}
                 onRangeChange={handleRangeChange}
                 onOrderChange={handleOrderChange}
                 onReshuffle={handleReshuffle}
@@ -951,12 +1020,14 @@ export default function Study() {
 }
 
 function SettingsPanel({
-  studyType, cardRange, orderMode, onTypeChange, onRangeChange, onOrderChange, onReshuffle,
+  include, grammarLevels, cardRange, orderMode, onIncludeChange, onGrammarLevelChange, onRangeChange, onOrderChange, onReshuffle,
 }: {
-  studyType: StudyType;
+  include: StudyInclude;
+  grammarLevels: GrammarLevels;
   cardRange: CardRange;
   orderMode: OrderMode;
-  onTypeChange: (v: StudyType) => void;
+  onIncludeChange: (key: keyof StudyInclude) => void;
+  onGrammarLevelChange: (key: keyof GrammarLevels) => void;
   onRangeChange: (v: CardRange) => void;
   onOrderChange: (v: OrderMode) => void;
   onReshuffle: () => void;
@@ -966,27 +1037,38 @@ function SettingsPanel({
       <SheetHeader className="mb-6">
         <SheetTitle>학습 설정</SheetTitle>
       </SheetHeader>
-      <div className="space-y-8 flex-1">
+      <div className="space-y-8 flex-1 overflow-y-auto">
         <div className="space-y-3">
-          <Label className="text-base font-semibold">카드 유형</Label>
-          <RadioGroup value={studyType} onValueChange={v => onTypeChange(v as StudyType)} className="flex flex-col space-y-2">
+          <Label className="text-base font-semibold">카드 유형 <span className="text-xs font-normal text-muted-foreground">(중복 선택)</span></Label>
+          <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-3">
-              <RadioGroupItem value="both" id="s-both" />
-              <Label htmlFor="s-both" className="font-normal">혼합</Label>
+              <Checkbox id="s-words" checked={include.words} onCheckedChange={() => onIncludeChange("words")} />
+              <Label htmlFor="s-words" className="font-normal cursor-pointer">단어</Label>
             </div>
             <div className="flex items-center space-x-3">
-              <RadioGroupItem value="words" id="s-words" />
-              <Label htmlFor="s-words" className="font-normal">단어만</Label>
+              <Checkbox id="s-kanji" checked={include.kanji} onCheckedChange={() => onIncludeChange("kanji")} />
+              <Label htmlFor="s-kanji" className="font-normal cursor-pointer">한자</Label>
             </div>
             <div className="flex items-center space-x-3">
-              <RadioGroupItem value="kanji" id="s-kanji" />
-              <Label htmlFor="s-kanji" className="font-normal">한자만</Label>
+              <Checkbox id="s-grammar" checked={include.grammar} onCheckedChange={() => onIncludeChange("grammar")} />
+              <Label htmlFor="s-grammar" className="font-normal cursor-pointer">문법</Label>
+              {/* 문법 급수 세부선택 — 문법 미선택 시 비활성화(이전 체크 상태는 유지) */}
+              <div className="flex items-center gap-2 ml-2">
+                {GRAMMAR_LEVEL_KEYS.map(lv => (
+                  <label key={lv} className={cn("flex items-center gap-1 text-xs cursor-pointer", !include.grammar && "opacity-40 cursor-not-allowed")}>
+                    <Checkbox
+                      id={`s-lv-${lv}`}
+                      checked={grammarLevels[lv]}
+                      disabled={!include.grammar}
+                      onCheckedChange={() => onGrammarLevelChange(lv)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span>{lv}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="grammar" id="s-grammar" />
-              <Label htmlFor="s-grammar" className="font-normal">문법만</Label>
-            </div>
-          </RadioGroup>
+          </div>
         </div>
 
         <div className="space-y-3">

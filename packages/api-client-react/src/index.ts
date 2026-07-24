@@ -96,7 +96,9 @@ export interface StudySessionItem {
   history: number[];
   remaining: number[];
   studyStep: number;
-  studyType: "both" | "words" | "kanji";
+  studyType?: string;
+  studyInclude?: { words: boolean; kanji: boolean; grammar: boolean };
+  grammarLevels?: { N5: boolean; N4: boolean; N3: boolean };
   cardRange: "today" | "recent" | "all";
   orderMode?: "random" | "sequence";
   savedAt: number;
