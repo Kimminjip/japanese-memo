@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   useListWords,
   useListKanji,
+  useListGrammar,
   useUpdateWord,
   useUpdateKanji,
   useRecordWordWrong,
   useRecordKanjiWrong,
   useRecordWordEasy,
   useRecordKanjiEasy,
+  useRecordGrammarWrong,
+  useRecordGrammarEasy,
   useGetStudySession,
   useSaveStudySession,
   useClearStudySession,
@@ -31,19 +34,23 @@ import { useToast } from "@/hooks/use-toast";
 
 const WEAK_THRESHOLD = 3;
 
-type StudyType = "both" | "words" | "kanji";
+type StudyType = "both" | "words" | "kanji" | "grammar";
 type CardRange = "today" | "recent" | "all";
 type OrderMode = "random" | "sequence";
 type AnimPhase = "idle" | "exit-left" | "exit-right" | "exit-up" | "enter-right" | "enter-left" | "enter-down" | "cover-left";
 
 interface StudyCard {
   id: number;
-  type: "word" | "kanji";
+  type: "word" | "kanji" | "grammar";
   japanese: string;
   furigana?: string | null;
   korean?: string;
   onyomi?: string;
   kunyomi?: string;
+  formation?: string;
+  example?: string;
+  exampleKorean?: string;
+  exampleHighlight?: string | null;
   wrongCount?: number;
   manualWeak?: boolean;
   jlptLevel?: string | null;
@@ -56,7 +63,7 @@ const SESSION_KEY = "study_session";
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface StudySession {
-  deckIds: { id: number; type: "word" | "kanji" }[];
+  deckIds: { id: number; type: "word" | "kanji" | "grammar" }[];
   currentIdx: number;
   history: number[];
   remaining: number[];
@@ -96,6 +103,10 @@ function buildCardFromKanji(k: any): StudyCard {
   return { id: k.id, type: "kanji", japanese: k.character, onyomi: k.onyomi, kunyomi: k.kunyomi, korean: k.korean, wrongCount: k.wrongCount, manualWeak: k.manualWeak, jlptLevel: k.jlptLevel };
 }
 
+function buildCardFromGrammar(g: any): StudyCard {
+  return { id: g.id, type: "grammar", japanese: g.pattern, korean: g.meaning, formation: g.formation, example: g.example, exampleKorean: g.exampleKorean, exampleHighlight: g.exampleHighlight, wrongCount: g.wrongCount, manualWeak: g.manualWeak, jlptLevel: g.jlptLevel };
+}
+
 function difficultyWeight(wrongCount: number | undefined, manualWeak: boolean | undefined): number {
   return (wrongCount ?? 0) * 2 + (manualWeak ? 5 : 0) + 1;
 }
@@ -110,12 +121,16 @@ function weightedShuffle<T>(items: T[], weight: (item: T) => number): T[] {
 function loadDeck(
   words: any[] | undefined,
   kanji: any[] | undefined,
+  grammar: any[] | undefined,
   studyType: StudyType,
   cardRange: CardRange,
   orderMode: OrderMode
 ): StudyCard[] {
   let items: (StudyCard & { _createdAt?: string; _studiedAt?: string | null })[] = [];
 
+  if (studyType === "grammar") {
+    items.push(...(grammar ?? []).map(g => ({ ...buildCardFromGrammar(g), _createdAt: g.createdAt, _studiedAt: g.studiedAt })));
+  }
   if (studyType === "words" || studyType === "both") {
     items.push(...(words ?? []).map(w => ({ ...buildCardFromWord(w), _createdAt: w.createdAt, _studiedAt: w.studiedAt })));
   }
@@ -162,6 +177,7 @@ function tryRestoreSession(
   session: StudySession,
   words: any[] | undefined,
   kanji: any[] | undefined,
+  grammar: any[] | undefined,
   studyType: StudyType,
   cardRange: CardRange,
 ): { deck: StudyCard[]; currentIdx: number; history: number[]; remaining: number[]; studyStep: number } | null {
@@ -169,15 +185,16 @@ function tryRestoreSession(
 
   const wordMap = new Map((words ?? []).map(w => [w.id, w]));
   const kanjiMap = new Map((kanji ?? []).map(k => [k.id, k]));
+  const grammarMap = new Map((grammar ?? []).map(g => [g.id, g]));
 
   const newDeck: StudyCard[] = [];
   const oldToNew = new Map<number, number>();
 
   session.deckIds.forEach(({ id, type }, oldIdx) => {
-    const item = type === "word" ? wordMap.get(id) : kanjiMap.get(id);
+    const item = type === "word" ? wordMap.get(id) : type === "kanji" ? kanjiMap.get(id) : grammarMap.get(id);
     if (!item) return;
     oldToNew.set(oldIdx, newDeck.length);
-    newDeck.push(type === "word" ? buildCardFromWord(item) : buildCardFromKanji(item));
+    newDeck.push(type === "word" ? buildCardFromWord(item) : type === "kanji" ? buildCardFromKanji(item) : buildCardFromGrammar(item));
   });
 
   if (newDeck.length === 0) return null;
@@ -215,6 +232,7 @@ export default function Study() {
 
   const { data: words } = useListWords();
   const { data: kanji } = useListKanji();
+  const { data: grammar } = useListGrammar();
   const { data: serverSessionData, isLoading: serverSessionLoading } = useGetStudySession({
     query: { enabled: !weakMode, retry: 2, staleTime: 0 },
   });
@@ -230,6 +248,8 @@ export default function Study() {
   const recordKanjiWrongMutate = useRecordKanjiWrong();
   const recordWordEasyMutate = useRecordWordEasy();
   const recordKanjiEasyMutate = useRecordKanjiEasy();
+  const recordGrammarWrongMutate = useRecordGrammarWrong();
+  const recordGrammarEasyMutate = useRecordGrammarEasy();
   const speakJapanese = useSpeakJapanese();
   const recordActivity = useRecordActivity();
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
@@ -239,11 +259,13 @@ export default function Study() {
 
   const wordsRef = useRef(words);
   const kanjiRef = useRef(kanji);
+  const grammarRef = useRef(grammar);
   const studyTypeRef = useRef(studyType);
   const cardRangeRef = useRef(cardRange);
   const orderModeRef = useRef(orderMode);
   wordsRef.current = words;
   kanjiRef.current = kanji;
+  grammarRef.current = grammar;
   studyTypeRef.current = studyType;
   cardRangeRef.current = cardRange;
   orderModeRef.current = orderMode;
@@ -332,15 +354,16 @@ export default function Study() {
     if (!card) return;
     if (card.type === "word") {
       setEditTarget({ cardType: "word", id: card.id, japanese: card.japanese, furigana: card.furigana ?? null, korean: card.korean ?? "" });
-    } else {
+    } else if (card.type === "kanji") {
       setEditTarget({ cardType: "kanji", id: card.id, character: card.japanese, onyomi: card.onyomi ?? "", kunyomi: card.kunyomi ?? "", korean: card.korean ?? "" });
     }
+    // grammar 카드는 편집 다이얼로그 미지원 (카드 목록에서 삭제 후 재추가)
   }, [deck, currentIdx]);
 
   // 데이터 첫 도착 시 초기화 — words, kanji, 서버 세션 모두 도착한 후에만 실행
   useEffect(() => {
     if (hasInitialized.current) return;
-    if (words === undefined || kanji === undefined) return; // 둘 다 로드 완료까지 대기
+    if (words === undefined || kanji === undefined || grammar === undefined) return; // 모두 로드 완료까지 대기
     if (!weakMode && serverSessionLoading) return; // 서버 응답 대기
 
     hasInitialized.current = true;
@@ -378,7 +401,7 @@ export default function Study() {
         }
 
         const restored = tryRestoreSession(
-          sessionToUse, words, kanji,
+          sessionToUse, words, kanji, grammar,
           sessionToUse.studyType, sessionToUse.cardRange
         );
         if (restored) {
@@ -396,14 +419,14 @@ export default function Study() {
     }
 
     setDeckKey(k => k + 1);
-  }, [words, kanji, weakMode, serverSessionLoading, serverSessionData]);
+  }, [words, kanji, grammar, weakMode, serverSessionLoading, serverSessionData]);
 
   // deckKey 변경 시 덱 새로 빌드
   useEffect(() => {
     if (deckKey === 0) return;
     const newDeck = weakMode
       ? loadDeckWeak(wordsRef.current, kanjiRef.current)
-      : loadDeck(wordsRef.current, kanjiRef.current, studyTypeRef.current, cardRangeRef.current, orderModeRef.current);
+      : loadDeck(wordsRef.current, kanjiRef.current, grammarRef.current, studyTypeRef.current, cardRangeRef.current, orderModeRef.current);
     setDeck(newDeck);
     setCurrentIdx(0);
     setHistory([]);
@@ -509,6 +532,8 @@ export default function Study() {
     if (card.type === "word") {
       // 후리가나가 있으면 정확한 발음을 위해 우선 사용 (한자 원문은 Google TTS가 잘못 읽을 수 있음)
       text = (card.furigana ?? "").trim() || card.japanese;
+    } else if (card.type === "grammar") {
+      text = (card.example ?? "").trim() || card.japanese;
     } else {
       const kun = (card.kunyomi ?? "").split("\n")[0].trim();
       const on = (card.onyomi ?? "").split("\n")[0].trim();
@@ -524,12 +549,14 @@ export default function Study() {
     recordActivity.mutate({ count: 1 });
     if (direction === "easy") {
       if (card.type === "word") recordWordEasyMutate.mutate({ id: card.id });
-      else recordKanjiEasyMutate.mutate({ id: card.id });
+      else if (card.type === "kanji") recordKanjiEasyMutate.mutate({ id: card.id });
+      else recordGrammarEasyMutate.mutate({ id: card.id });
     } else {
       if (card.type === "word") recordWordWrongMutate.mutate({ id: card.id });
-      else recordKanjiWrongMutate.mutate({ id: card.id });
+      else if (card.type === "kanji") recordKanjiWrongMutate.mutate({ id: card.id });
+      else recordGrammarWrongMutate.mutate({ id: card.id });
     }
-  }, [deck, currentIdx, recordActivity, recordWordEasyMutate, recordKanjiEasyMutate, recordWordWrongMutate, recordKanjiWrongMutate]);
+  }, [deck, currentIdx, recordActivity, recordWordEasyMutate, recordKanjiEasyMutate, recordWordWrongMutate, recordKanjiWrongMutate, recordGrammarEasyMutate, recordGrammarWrongMutate]);
 
   // 슬라이드 애니메이션
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
@@ -597,6 +624,12 @@ export default function Study() {
         if (reading) await speakJapanese(reading, "ja");
         if (!stillActive()) return;
         if (koreanFirst) await speakJapanese(koreanFirst, "ko");
+      } else if (card.type === "grammar") {
+        const jp = (card.example ?? "").trim() || card.japanese;
+        const ko = (card.korean ?? "").trim();
+        if (jp) await speakJapanese(jp, "ja");
+        if (!stillActive()) return;
+        if (ko) await speakJapanese(ko, "ko");
       } else {
         const kun = (card.kunyomi ?? "").split("\n")[0].trim();
         const on = (card.onyomi ?? "").split("\n")[0].trim();
@@ -859,6 +892,10 @@ export default function Study() {
                 korean={underlayCard.korean}
                 onyomi={underlayCard.onyomi}
                 kunyomi={underlayCard.kunyomi}
+                formation={underlayCard.formation}
+                example={underlayCard.example}
+                exampleKorean={underlayCard.exampleKorean}
+                exampleHighlight={underlayCard.exampleHighlight}
                 wrongCount={underlayCard.wrongCount}
                 manualWeak={underlayCard.manualWeak}
                 jlptLevel={underlayCard.jlptLevel}
@@ -878,12 +915,16 @@ export default function Study() {
               korean={card.korean}
               onyomi={card.onyomi}
               kunyomi={card.kunyomi}
+              formation={card.formation}
+              example={card.example}
+              exampleKorean={card.exampleKorean}
+              exampleHighlight={card.exampleHighlight}
               wrongCount={card.wrongCount}
               manualWeak={card.manualWeak}
               jlptLevel={card.jlptLevel}
               isFlipped={isFlipped}
-              onToggleWeak={handleToggleWeak}
-              onEdit={handleEdit}
+              onToggleWeak={card.type === "grammar" ? undefined : handleToggleWeak}
+              onEdit={card.type === "grammar" ? undefined : handleEdit}
             />
           </div>
         </div>
@@ -940,6 +981,10 @@ function SettingsPanel({
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="kanji" id="s-kanji" />
               <Label htmlFor="s-kanji" className="font-normal">한자만</Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="grammar" id="s-grammar" />
+              <Label htmlFor="s-grammar" className="font-normal">문법만</Label>
             </div>
           </RadioGroup>
         </div>

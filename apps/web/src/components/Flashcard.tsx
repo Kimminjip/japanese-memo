@@ -5,12 +5,17 @@ import { cn } from "@/lib/utils";
 const WEAK_THRESHOLD = 3;
 
 interface FlashcardProps {
-  type: "word" | "kanji";
+  type: "word" | "kanji" | "grammar";
   japanese: string;
   furigana?: string | null;
   korean?: string;
   onyomi?: string;
   kunyomi?: string;
+  // grammar 전용
+  formation?: string;
+  example?: string;
+  exampleKorean?: string;
+  exampleHighlight?: string | null;
   wrongCount?: number;
   manualWeak?: boolean;
   jlptLevel?: string | null;
@@ -19,6 +24,19 @@ interface FlashcardProps {
   onToggleWeak?: () => void;
   onEdit?: () => void;
   onSpeak?: () => void;
+}
+
+// 예문에서 문형 부분에 밑줄
+function renderHighlighted(example: string, highlight?: string | null) {
+  if (!highlight || !example.includes(highlight)) return example;
+  const idx = example.indexOf(highlight);
+  return (
+    <>
+      {example.slice(0, idx)}
+      <span className="underline decoration-primary decoration-2 underline-offset-4 font-semibold">{highlight}</span>
+      {example.slice(idx + highlight.length)}
+    </>
+  );
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -42,6 +60,10 @@ export function Flashcard({
   korean,
   onyomi,
   kunyomi,
+  formation,
+  example,
+  exampleKorean,
+  exampleHighlight,
   wrongCount,
   manualWeak,
   jlptLevel,
@@ -176,9 +198,11 @@ export function Flashcard({
             )}
             <span
               className={cn(
-                "font-serif font-medium text-foreground",
+                "font-serif font-medium text-foreground break-keep px-2",
                 type === "word"
                   ? "text-4xl sm:text-5xl lg:text-7xl"
+                  : type === "grammar"
+                  ? "text-3xl sm:text-4xl lg:text-5xl"
                   : "text-6xl sm:text-7xl lg:text-9xl"
               )}
             >
@@ -189,7 +213,30 @@ export function Flashcard({
 
         {/* Back — 내용에 따라 자유롭게 확장 */}
         <div style={{ gridArea: "1/1" }} className="bg-card rounded-xl border border-primary/20 shadow-md backface-hidden rotate-y-180 flex flex-col items-center justify-center p-6 text-center min-h-52 sm:min-h-60 lg:min-h-72">
-          {type === "word" ? (
+          {type === "grammar" ? (
+            <div className="flex flex-col gap-3 w-full px-2 text-left">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">의미</span>
+                <span className="text-xl sm:text-2xl font-medium text-foreground break-keep">{korean || "-"}</span>
+              </div>
+              {formation && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">접속</span>
+                  <span className="font-serif text-base sm:text-lg text-foreground break-keep">{formation}</span>
+                </div>
+              )}
+              {example && (
+                <div className="flex flex-col gap-0.5 pt-1 border-t border-border/50">
+                  <span className="font-serif text-lg sm:text-xl text-foreground break-keep leading-relaxed">
+                    {renderHighlighted(example, exampleHighlight)}
+                  </span>
+                  {exampleKorean && (
+                    <span className="text-sm text-muted-foreground break-keep">{exampleKorean}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : type === "word" ? (
             <div className="flex flex-col items-center gap-1.5 w-full">
               {koreanLines.length > 1 ? (() => {
                 const longest = koreanLines.reduce((a, b) => a.length >= b.length ? a : b, "");

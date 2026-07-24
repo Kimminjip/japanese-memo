@@ -8,7 +8,7 @@ import { Check, X, RotateCcw, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type QuizState = "setup" | "playing" | "results";
-type QuizType = "words" | "kanji" | "both" | "weak";
+type QuizType = "words" | "kanji" | "both" | "weak" | "kanji-writing";
 type CardRange = "today" | "recent" | "all";
 
 interface Question {
@@ -18,6 +18,7 @@ interface Question {
   questionLabel?: string;
   correctAnswer: string;
   options: string[];
+  writing?: boolean; // 표기 문제 (질문=뜻·읽기 텍스트, 보기=한자)
 }
 
 export default function Quiz() {
@@ -77,6 +78,10 @@ export default function Quiz() {
       if ((quizType === "kanji" || quizType === "both") && kanji) {
         sourceItems.push(...kanji.map(k => ({ ...k, type: "kanji" })));
       }
+      if (quizType === "kanji-writing" && kanji) {
+        // 표기 문제: 뜻·읽기 → 한자 고르기 (한글 뜻음이 있는 한자만)
+        sourceItems.push(...kanji.filter(k => (k.korean ?? "").trim().length > 0).map(k => ({ ...k, type: "kanji-writing" })));
+      }
     }
 
     if (quizType !== "weak") {
@@ -115,7 +120,15 @@ export default function Quiz() {
       const pickOne = (s: string) => { const lines = splitLines(s); return lines[Math.floor(Math.random() * lines.length)] || s; };
       // AI가 미리 만들어 둔 그럴듯한 오답 보기 (있으면 우선 사용)
       let aiDistractors: string[] = [];
-      if (item.type === "word") {
+      if (item.type === "kanji-writing") {
+        // 표기 문제: 뜻·읽기 제시 → 올바른 한자 고르기
+        const reading = [pickOne(item.onyomi || ""), pickOne(item.kunyomi || "")].filter(Boolean)[0] || "";
+        questionText = [item.korean?.split("\n")[0]?.trim(), reading].filter(Boolean).join("  ·  ");
+        questionLabel = "알맞은 한자를 고르세요";
+        correctAnswer = item.character;
+        // 오답: 다른 한자 글자들
+        allPossibleWrong = kanji ? kanji.filter(k => k.id !== item.id).map(k => k.character) : [];
+      } else if (item.type === "word") {
         correctAnswer = pickOne(item.korean);
         questionText = item.japanese;
         aiDistractors = Array.isArray(item.distractors) ? item.distractors : [];
@@ -148,11 +161,12 @@ export default function Quiz() {
 
       return {
         id: item.id,
-        itemType: item.type as "word" | "kanji",
+        itemType: (item.type === "kanji-writing" ? "kanji" : item.type) as "word" | "kanji",
         question: questionText,
         questionLabel: questionLabel || undefined,
         correctAnswer,
-        options
+        options,
+        writing: item.type === "kanji-writing",
       };
     });
 
@@ -232,7 +246,11 @@ export default function Quiz() {
                 </div>
                 <div className="flex items-center space-x-3">
                   <RadioGroupItem value="kanji" id="q-kanji" />
-                  <Label htmlFor="q-kanji" className="text-base font-normal">한자만</Label>
+                  <Label htmlFor="q-kanji" className="text-base font-normal">한자만 (읽기 맞히기)</Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="kanji-writing" id="q-kanji-writing" />
+                  <Label htmlFor="q-kanji-writing" className="text-base font-normal">한자 표기 (뜻·읽기 → 한자 고르기)</Label>
                 </div>
                 <div className="flex items-center space-x-3">
                   <RadioGroupItem value="weak" id="q-weak" />
@@ -359,7 +377,7 @@ export default function Quiz() {
       </div>
 
       <Card className="min-h-[200px] flex flex-col justify-center text-center p-8 border-primary/20 shadow-md">
-        <div className={cn("font-serif font-bold", q.itemType === "word" ? "text-6xl" : "text-8xl")}>
+        <div className={cn("font-serif font-bold break-keep", q.writing ? "text-3xl sm:text-4xl" : q.itemType === "word" ? "text-6xl" : "text-8xl")}>
           {q.question}
         </div>
         {q.questionLabel && (
@@ -387,7 +405,8 @@ export default function Quiz() {
               key={idx}
               variant={btnVariant}
               className={cn(
-                "h-20 text-base sm:text-lg break-keep whitespace-normal leading-snug px-3",
+                "h-20 break-keep whitespace-normal leading-snug px-3",
+                q.writing ? "font-serif text-4xl sm:text-5xl" : "text-base sm:text-lg",
                 extraClass
               )}
               onClick={() => handleAnswer(opt)}

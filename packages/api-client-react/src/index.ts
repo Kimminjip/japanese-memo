@@ -19,6 +19,9 @@ export const getGetStudySessionQueryKey = () => ["study-session"] as const;
 
 export const getGetActivityQueryKey = () => ["stats", "activity"] as const;
 
+export const getListGrammarQueryKey = (params?: { dateFilter?: string }) =>
+  params ? (["grammar", params] as const) : (["grammar"] as const);
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Word {
@@ -46,6 +49,31 @@ export interface Kanji {
   studiedAt: string | null;
   jlptLevel: string | null;
   distractors?: string[] | null;
+}
+
+export interface Grammar {
+  id: number;
+  pattern: string;
+  meaning: string;
+  formation: string;
+  example: string;
+  exampleKorean: string;
+  exampleHighlight: string | null;
+  wrongCount: number;
+  manualWeak: boolean;
+  createdAt: string;
+  studiedAt: string | null;
+  jlptLevel: string | null;
+}
+
+export interface GrammarDetail {
+  pattern: string;
+  meaning: string;
+  formation: string;
+  example: string;
+  exampleKorean: string;
+  exampleHighlight: string;
+  jlptLevel: string;
 }
 
 export interface StatsSummary {
@@ -213,6 +241,70 @@ export function useMarkKanjiStudied() {
       const res = await api.post(`/kanji/${id}/studied`);
       return res.data;
     },
+  });
+}
+
+// ─── Grammar ───────────────────────────────────────────────────────────────────
+
+export function useListGrammar(
+  params?: { dateFilter?: "today" | "recent" | "all" },
+  options?: Partial<UseQueryOptions<Grammar[]>>
+) {
+  return useQuery<Grammar[]>({
+    queryKey: getListGrammarQueryKey(params),
+    queryFn: async () => {
+      const { data } = await api.get("/grammar", { params });
+      return data;
+    },
+    ...options,
+  });
+}
+
+export function useCreateGrammar() {
+  return useMutation<Grammar, Error, { data: { pattern: string; meaning: string; formation?: string; example?: string; exampleKorean?: string; exampleHighlight?: string | null; jlptLevel?: string | null } }>({
+    mutationFn: async ({ data }) => {
+      const res = await api.post("/grammar", data);
+      return res.data;
+    },
+  });
+}
+
+export function useUpdateGrammar() {
+  return useMutation<Grammar, Error, { id: number; data: Partial<{ pattern: string; meaning: string; formation: string; example: string; exampleKorean: string; exampleHighlight: string | null; jlptLevel: string | null }> }>({
+    mutationFn: async ({ id, data }) => {
+      const res = await api.put(`/grammar/${id}`, data);
+      return res.data;
+    },
+  });
+}
+
+export function useDeleteGrammar() {
+  return useMutation<void, Error, { id: number }>({
+    mutationFn: async ({ id }) => { await api.delete(`/grammar/${id}`); },
+  });
+}
+
+export function useRecordGrammarWrong() {
+  return useMutation<Grammar, Error, { id: number }>({
+    mutationFn: async ({ id }) => (await api.post(`/grammar/${id}/wrong`)).data,
+  });
+}
+
+export function useRecordGrammarEasy() {
+  return useMutation<Grammar, Error, { id: number }>({
+    mutationFn: async ({ id }) => (await api.post(`/grammar/${id}/easy`)).data,
+  });
+}
+
+export function useMarkGrammarStudied() {
+  return useMutation<Grammar, Error, { id: number }>({
+    mutationFn: async ({ id }) => (await api.post(`/grammar/${id}/studied`)).data,
+  });
+}
+
+export function useLookupGrammar() {
+  return useMutation<GrammarDetail, Error, { pattern: string }>({
+    mutationFn: async ({ pattern }) => (await api.post("/grammar/lookup", { pattern })).data,
   });
 }
 

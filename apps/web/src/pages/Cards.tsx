@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import {
-  useListWords, useListKanji,
-  useDeleteWord, useDeleteKanji,
+  useListWords, useListKanji, useListGrammar,
+  useDeleteWord, useDeleteKanji, useDeleteGrammar,
   useUpdateWord, useUpdateKanji,
-  useMarkWordStudied, useMarkKanjiStudied,
+  useMarkWordStudied, useMarkKanjiStudied, useMarkGrammarStudied,
   useSpeakJapanese,
-  getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey,
+  getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, getGetStatsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,7 @@ import { EditDialog, EditTarget } from "@/components/EditDialog";
 
 const WEAK_THRESHOLD = 3;
 
-type FilterType = "all" | "words" | "kanji";
+type FilterType = "all" | "words" | "kanji" | "grammar";
 type JlptFilter = "all" | "N5" | "N4" | "N3" | "N2" | "N1" | "none";
 
 function CardListItem({
@@ -36,6 +36,7 @@ function CardListItem({
   const updateKanji = useUpdateKanji();
   const markWordStudied = useMarkWordStudied();
   const markKanjiStudied = useMarkKanjiStudied();
+  const markGrammarStudied = useMarkGrammarStudied();
   const speakJapanese = useSpeakJapanese();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -78,22 +79,18 @@ function CardListItem({
   }, [item, updateWord, updateKanji, queryClient, toast]);
 
   const handleMarkStudied = useCallback(() => {
+    const done = (key: readonly unknown[]) => {
+      queryClient.invalidateQueries({ queryKey: key });
+      toast({ title: "✓ 오늘 학습으로 기록했습니다." });
+    };
     if (item.cardType === "word") {
-      markWordStudied.mutate({ id: item.id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListWordsQueryKey() });
-          toast({ title: "✓ 오늘 학습으로 기록했습니다." });
-        },
-      });
+      markWordStudied.mutate({ id: item.id }, { onSuccess: () => done(getListWordsQueryKey()) });
+    } else if (item.cardType === "kanji") {
+      markKanjiStudied.mutate({ id: item.id }, { onSuccess: () => done(getListKanjiQueryKey()) });
     } else {
-      markKanjiStudied.mutate({ id: item.id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListKanjiQueryKey() });
-          toast({ title: "✓ 오늘 학습으로 기록했습니다." });
-        },
-      });
+      markGrammarStudied.mutate({ id: item.id }, { onSuccess: () => done(getListGrammarQueryKey()) });
     }
-  }, [item, markWordStudied, markKanjiStudied, queryClient, toast]);
+  }, [item, markWordStudied, markKanjiStudied, markGrammarStudied, queryClient, toast]);
 
   const startPress = () => {
     didLongPress.current = false;
@@ -141,7 +138,7 @@ function CardListItem({
           onToggleWeak={handleToggleWeak}
           onSpeak={() => speakJapanese((item.furigana ?? "").trim() || item.japanese)}
         />
-      ) : (
+      ) : item.cardType === "kanji" ? (
         <Flashcard
           type="kanji"
           japanese={item.character}
@@ -156,17 +153,33 @@ function CardListItem({
           onToggleWeak={handleToggleWeak}
           onSpeak={() => speakJapanese(item.character)}
         />
+      ) : (
+        <Flashcard
+          type="grammar"
+          japanese={item.pattern}
+          korean={item.meaning}
+          formation={item.formation}
+          example={item.example}
+          exampleKorean={item.exampleKorean}
+          exampleHighlight={item.exampleHighlight}
+          jlptLevel={item.jlptLevel}
+          isFlipped={isFlipped}
+          onFlip={handleFlip}
+          onSpeak={item.example ? () => speakJapanese(item.example) : undefined}
+        />
       )}
-      <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-        <Button
-          variant="secondary"
-          size="icon"
-          className="shadow-sm"
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </div>
+      {item.cardType !== "grammar" && (
+        <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="shadow-sm"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
       {/* 오늘 학습 버튼 */}
       <button
         type="button"
@@ -200,19 +213,24 @@ export default function Cards() {
 
   const { data: words, isLoading: wordsLoading } = useListWords();
   const { data: kanji, isLoading: kanjiLoading } = useListKanji();
+  const { data: grammar, isLoading: grammarLoading } = useListGrammar();
 
   const deleteWord = useDeleteWord();
   const deleteKanji = useDeleteKanji();
+  const deleteGrammar = useDeleteGrammar();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const allCards = useMemo(() => {
-    const list = [];
+    const list: any[] = [];
     if (words && (filter === "all" || filter === "words")) {
       list.push(...words.map(w => ({ ...w, cardType: "word" as const })));
     }
     if (kanji && (filter === "all" || filter === "kanji")) {
       list.push(...kanji.map(k => ({ ...k, cardType: "kanji" as const })));
+    }
+    if (grammar && (filter === "all" || filter === "grammar")) {
+      list.push(...grammar.map(g => ({ ...g, cardType: "grammar" as const })));
     }
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     let result = list;
@@ -224,32 +242,29 @@ export default function Cards() {
       result = result.filter(item => {
         if (item.cardType === "word") {
           return item.japanese.includes(q) || item.korean.toLowerCase().includes(q) || (item.furigana && item.furigana.includes(q));
-        } else {
+        } else if (item.cardType === "kanji") {
           return item.character.includes(q) || item.onyomi.includes(q) || item.kunyomi.includes(q) || item.korean.toLowerCase().includes(q);
+        } else {
+          return item.pattern.includes(q) || item.meaning.toLowerCase().includes(q) || (item.example && item.example.includes(q));
         }
       });
     }
     return result;
-  }, [words, kanji, filter, jlptFilter, search]);
+  }, [words, kanji, grammar, filter, jlptFilter, search]);
 
-  const handleDelete = (id: number, type: "word" | "kanji") => {
+  const handleDelete = (id: number, type: "word" | "kanji" | "grammar") => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
+    const done = (key: readonly unknown[]) => {
+      queryClient.invalidateQueries({ queryKey: key });
+      queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
+      toast({ title: "삭제되었습니다." });
+    };
     if (type === "word") {
-      deleteWord.mutate({ id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListWordsQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
-          toast({ title: "삭제되었습니다." });
-        }
-      });
+      deleteWord.mutate({ id }, { onSuccess: () => done(getListWordsQueryKey()) });
+    } else if (type === "kanji") {
+      deleteKanji.mutate({ id }, { onSuccess: () => done(getListKanjiQueryKey()) });
     } else {
-      deleteKanji.mutate({ id }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListKanjiQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
-          toast({ title: "삭제되었습니다." });
-        }
-      });
+      deleteGrammar.mutate({ id }, { onSuccess: () => done(getListGrammarQueryKey()) });
     }
   };
 
@@ -261,20 +276,21 @@ export default function Cards() {
     }
   };
 
-  const isLoading = wordsLoading || kanjiLoading;
+  const isLoading = wordsLoading || kanjiLoading || grammarLoading;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">모든 카드</h1>
-          <p className="text-muted-foreground mt-1">추가한 모든 단어와 한자를 확인합니다.</p>
+          <p className="text-muted-foreground mt-1">추가한 모든 단어·한자·문법을 확인합니다.</p>
         </div>
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="w-full sm:w-[300px]">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="w-full sm:w-[360px]">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">전체</TabsTrigger>
             <TabsTrigger value="words">단어</TabsTrigger>
             <TabsTrigger value="kanji">한자</TabsTrigger>
+            <TabsTrigger value="grammar">문법</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

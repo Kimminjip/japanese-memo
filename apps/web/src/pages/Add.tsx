@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { VirtualKeyboard } from "@/components/VirtualKeyboard";
-import { useCreateWord, useCreateKanji, useListWords, useListKanji, getListWordsQueryKey, getListKanjiQueryKey, getGetStatsSummaryQueryKey } from "@workspace/api-client-react";
+import { useCreateWord, useCreateKanji, useCreateGrammar, useLookupGrammar, useListWords, useListKanji, useListGrammar, getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, getGetStatsSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Keyboard, Plus, X, AlertTriangle, ChevronRight, Sparkles, RotateCcw } from "lucide-react";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
@@ -42,7 +42,7 @@ export default function Add() {
 
   useEffect(() => {
     const saved = localStorage.getItem(LAST_TAB_KEY);
-    if (saved === "word" || saved === "kanji") {
+    if (saved === "word" || saved === "kanji" || saved === "grammar") {
       setActiveTab(saved);
     }
   }, [location]);
@@ -61,10 +61,79 @@ export default function Add() {
   const [aiLoadingWord, setAiLoadingWord] = useState(false);
   const [aiLoadingKanji, setAiLoadingKanji] = useState(false);
 
+  // 문법 탭 상태
+  const [grammarPattern, setGrammarPattern] = useState("");
+  const [grammarMeaning, setGrammarMeaning] = useState("");
+  const [grammarFormation, setGrammarFormation] = useState("");
+  const [grammarExample, setGrammarExample] = useState("");
+  const [grammarExampleKorean, setGrammarExampleKorean] = useState("");
+  const [grammarHighlight, setGrammarHighlight] = useState("");
+  const [grammarLevel, setGrammarLevel] = useState<string | null>(null);
+  const [aiLoadingGrammar, setAiLoadingGrammar] = useState(false);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createWord = useCreateWord();
   const createKanji = useCreateKanji();
+  const createGrammar = useCreateGrammar();
+  const lookupGrammar = useLookupGrammar();
+  const { data: existingGrammar } = useListGrammar();
+
+  const duplicateGrammar = grammarPattern.trim()
+    ? existingGrammar?.find(g => g.pattern === grammarPattern.trim())
+    : null;
+
+  const handleAiGrammar = () => {
+    const pattern = grammarPattern.trim();
+    if (!pattern) { toast({ title: "문형을 먼저 입력해주세요.", variant: "destructive" }); return; }
+    setAiLoadingGrammar(true);
+    lookupGrammar.mutate({ pattern }, {
+      onSuccess: (d) => {
+        if (d.pattern) setGrammarPattern(d.pattern);
+        if (d.meaning) setGrammarMeaning(d.meaning);
+        if (d.formation) setGrammarFormation(d.formation);
+        if (d.example) setGrammarExample(d.example);
+        if (d.exampleKorean) setGrammarExampleKorean(d.exampleKorean);
+        if (d.exampleHighlight) setGrammarHighlight(d.exampleHighlight);
+        if (d.jlptLevel) setGrammarLevel(d.jlptLevel);
+        toast({ title: "AI가 자동입력했습니다. 내용을 확인해 주세요." });
+      },
+      onError: () => toast({ title: "AI 자동입력에 실패했습니다.", variant: "destructive" }),
+      onSettled: () => setAiLoadingGrammar(false),
+    });
+  };
+
+  const handleResetGrammar = () => {
+    setGrammarPattern(""); setGrammarMeaning(""); setGrammarFormation("");
+    setGrammarExample(""); setGrammarExampleKorean(""); setGrammarHighlight(""); setGrammarLevel(null);
+  };
+
+  const onSubmitGrammar = () => {
+    if (!grammarPattern.trim() || !grammarMeaning.trim()) {
+      toast({ title: "문형과 의미는 필수입니다.", variant: "destructive" });
+      return;
+    }
+    createGrammar.mutate({ data: {
+      pattern: grammarPattern.trim(),
+      meaning: grammarMeaning.trim(),
+      formation: grammarFormation.trim(),
+      example: grammarExample.trim(),
+      exampleKorean: grammarExampleKorean.trim(),
+      exampleHighlight: grammarHighlight.trim() || null,
+      jlptLevel: grammarLevel,
+    } }, {
+      onSuccess: () => {
+        toast({ title: "문법이 추가되었습니다." });
+        handleResetGrammar();
+        localStorage.setItem(LAST_TAB_KEY, "grammar");
+        queryClient.invalidateQueries({ queryKey: getListGrammarQueryKey() });
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? "";
+        toast({ title: msg.includes("이미 등록") ? "이미 등록된 문형입니다." : "추가에 실패했습니다.", variant: "destructive" });
+      },
+    });
+  };
 
   const callAi = async (body: object) => {
     const res = await fetch("/api/ai/lookup", {
@@ -326,9 +395,10 @@ export default function Add() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setShowKeyboard(false); }} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
+        <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="word" className="text-lg py-3">단어</TabsTrigger>
           <TabsTrigger value="kanji" className="text-lg py-3">한자</TabsTrigger>
+          <TabsTrigger value="grammar" className="text-lg py-3">문법</TabsTrigger>
         </TabsList>
 
         <Card className="border-primary/20 shadow-md">
@@ -697,6 +767,92 @@ export default function Add() {
               </Form>
 
               <ExcelImportKanji />
+            </TabsContent>
+
+            {/* GRAMMAR TAB */}
+            <TabsContent value="grammar" className="mt-0">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-base font-medium">문형</label>
+                  <Input
+                    className="text-3xl h-16 font-serif"
+                    placeholder="예: 〜たばかり"
+                    value={grammarPattern}
+                    onChange={e => setGrammarPattern(e.target.value)}
+                    lang="ja"
+                  />
+                </div>
+
+                {duplicateGrammar && (
+                  <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-3 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="text-amber-800 dark:text-amber-300">이미 등록된 문형입니다.</span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-base font-medium">의미</label>
+                  <Input
+                    className="text-2xl h-14"
+                    placeholder="한국어 의미"
+                    value={grammarMeaning}
+                    onChange={e => setGrammarMeaning(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-base font-medium flex justify-between"><span>접속</span><span className="text-muted-foreground text-sm font-normal">(선택)</span></label>
+                  <Input
+                    className="text-xl h-12 font-serif"
+                    placeholder="예: 동사 た형 + ばかり"
+                    value={grammarFormation}
+                    onChange={e => setGrammarFormation(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-base font-medium flex justify-between"><span>예문</span><span className="text-muted-foreground text-sm font-normal">(선택)</span></label>
+                  <Input
+                    className="text-xl h-12 font-serif"
+                    placeholder="일본어 예문"
+                    value={grammarExample}
+                    onChange={e => setGrammarExample(e.target.value)}
+                    lang="ja"
+                  />
+                  <Input
+                    className="text-base h-11"
+                    placeholder="예문 해석"
+                    value={grammarExampleKorean}
+                    onChange={e => setGrammarExampleKorean(e.target.value)}
+                  />
+                  <Input
+                    className="text-base h-11 font-serif"
+                    placeholder="밑줄 칠 부분 (예문 속 문형 표현, 예: たばかり)"
+                    value={grammarHighlight}
+                    onChange={e => setGrammarHighlight(e.target.value)}
+                    lang="ja"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button" variant="outline"
+                    className="flex-1 gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                    onClick={handleAiGrammar}
+                    disabled={aiLoadingGrammar}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {aiLoadingGrammar ? "AI 입력 중..." : "AI 자동입력 (의미 · 접속 · 예문)"}
+                  </Button>
+                  <Button type="button" variant="outline" size="icon" className="text-muted-foreground shrink-0" onClick={handleResetGrammar} title="입력 초기화">
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <Button type="button" size="lg" className="w-full text-lg h-14" disabled={createGrammar.isPending || !!duplicateGrammar} onClick={onSubmitGrammar}>
+                  {createGrammar.isPending ? "추가 중..." : duplicateGrammar ? "이미 등록된 문형" : "문법 추가하기"}
+                </Button>
+              </div>
             </TabsContent>
           </CardContent>
         </Card>
