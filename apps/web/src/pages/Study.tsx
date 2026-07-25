@@ -192,7 +192,16 @@ function loadDeck(
   }
 
   if (orderMode === "sequence") {
-    return [...items].sort((a, b) => new Date(a._createdAt ?? 0).getTime() - new Date(b._createdAt ?? 0).getTime());
+    // 쉬운 순서: 급수 오름차순(N5→N1) → 같은 급수 안에서는 생성일 순
+    const rank = (lv: string | null | undefined) => {
+      const m: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
+      return (lv && m[lv]) ?? 9;
+    };
+    return [...items].sort((a, b) => {
+      const r = rank(a.jlptLevel) - rank(b.jlptLevel);
+      if (r !== 0) return r;
+      return new Date(a._createdAt ?? 0).getTime() - new Date(b._createdAt ?? 0).getTime();
+    });
   }
 
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
@@ -1146,7 +1155,7 @@ function SettingsPanel({
             </div>
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="sequence" id="s-order-sequence" />
-              <Label htmlFor="s-order-sequence" className="font-normal">등록된 순서</Label>
+              <Label htmlFor="s-order-sequence" className="font-normal">쉬운 순서 (N5→N1)</Label>
             </div>
           </RadioGroup>
         </div>
