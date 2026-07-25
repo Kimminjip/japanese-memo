@@ -684,36 +684,53 @@ export default function Study() {
     const token = ++autoplayRunToken.current;
     const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
     const stillActive = () => autoplayRunToken.current === token;
+    const TILDE = /[〜～~]/g;
 
-    const readOnce = async () => {
-      if (card.type === "word") {
-        const reading = (card.furigana ?? "").trim() || card.japanese;
-        const koreanFirst = (card.korean ?? "").split("\n")[0]?.trim() ?? "";
-        if (reading) await speakJapanese(reading, "ja");
+    // 순서대로 읽기 (단계 사이 짧은 pause). 중간에 일시정지되면 즉시 중단.
+    const playSteps = async (steps: { text: string; lang: "ja" | "ko" }[]) => {
+      for (const s of steps) {
         if (!stillActive()) return;
-        if (koreanFirst) await speakJapanese(koreanFirst, "ko");
-      } else if (card.type === "grammar") {
-        const jp = (card.example ?? "").trim() || card.japanese;
-        const ko = (card.korean ?? "").trim();
-        if (jp) await speakJapanese(jp, "ja");
+        const t = s.text.trim();
+        if (!t) continue;
+        await speakJapanese(t, s.lang);
         if (!stillActive()) return;
-        if (ko) await speakJapanese(ko, "ko");
-      } else {
-        const kun = (card.kunyomi ?? "").split("\n")[0].trim();
-        const on = (card.onyomi ?? "").split("\n")[0].trim();
-        const text = [kun, on].filter(Boolean).join("、");
-        if (text) await speakJapanese(text, "ja");
+        await sleep(300);
       }
     };
 
     (async () => {
-      await readOnce();
+      if (card.type === "word") {
+        // 일본어 → 한국어 첫 뜻 → 일본어
+        const reading = (card.furigana ?? "").trim() || card.japanese;
+        const koreanFirst = (card.korean ?? "").split("\n")[0]?.trim() ?? "";
+        await playSteps([
+          { text: reading, lang: "ja" },
+          { text: koreanFirst, lang: "ko" },
+          { text: reading, lang: "ja" },
+        ]);
+      } else if (card.type === "grammar") {
+        // 문형 → 의미(한국어, '~'는 "무엇"으로) → 예문 → 예문 뜻
+        const patternJa = (card.japanese ?? "").replace(TILDE, "").trim();
+        const meaningKo = (card.korean ?? "").replace(TILDE, "무엇").trim();
+        await playSteps([
+          { text: patternJa, lang: "ja" },
+          { text: meaningKo, lang: "ko" },
+          { text: (card.example ?? "").trim(), lang: "ja" },
+          { text: (card.exampleKorean ?? "").trim(), lang: "ko" },
+        ]);
+      } else {
+        // 한자: 훈독、음독 2회 반복 (1초 pause)
+        const kun = (card.kunyomi ?? "").split("\n")[0].trim();
+        const on = (card.onyomi ?? "").split("\n")[0].trim();
+        const text = [kun, on].filter(Boolean).join("、");
+        if (text) await speakJapanese(text, "ja");
+        if (!stillActive()) return;
+        await sleep(1000);
+        if (!stillActive()) return;
+        if (text) await speakJapanese(text, "ja");
+      }
       if (!stillActive()) return;
-      await sleep(1000);
-      if (!stillActive()) return;
-      await readOnce();
-      if (!stillActive()) return;
-      await sleep(1000);
+      await sleep(600);
       if (!stillActive()) return;
       goNextWithAnim();
     })();
