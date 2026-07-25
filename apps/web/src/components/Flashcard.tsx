@@ -31,8 +31,9 @@ interface FlashcardProps {
 function renderHighlighted(example: string, highlight?: string | null, pattern?: string) {
   const core = (pattern ?? "").replace(/[〜～~\s]/g, "").trim();
   let target = "";
-  if (core && example.includes(core)) target = core;
-  else if (highlight && example.includes(highlight)) target = highlight;
+  // 정확히 지정된 highlight(문형 부분)를 우선 사용, 없으면 문형 핵심으로 폴백
+  if (highlight && example.includes(highlight)) target = highlight;
+  else if (core && example.includes(core)) target = core;
   if (!target) return example;
 
   const idx = example.indexOf(target);
