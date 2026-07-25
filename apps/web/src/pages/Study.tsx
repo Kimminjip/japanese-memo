@@ -5,6 +5,7 @@ import {
   useListGrammar,
   useUpdateWord,
   useUpdateKanji,
+  useUpdateGrammar,
   useRecordWordWrong,
   useRecordKanjiWrong,
   useRecordWordEasy,
@@ -18,6 +19,7 @@ import {
   useRecordActivity,
   getListWordsQueryKey,
   getListKanjiQueryKey,
+  getListGrammarQueryKey,
   getGetWeakItemsQueryKey,
 } from "@workspace/api-client-react";
 
@@ -190,6 +192,7 @@ function loadDeck(
 function loadDeckWeak(
   words: any[] | undefined,
   kanji: any[] | undefined,
+  grammar: any[] | undefined,
 ): StudyCard[] {
   const items: StudyCard[] = [];
   (words ?? []).forEach(w => {
@@ -197,6 +200,9 @@ function loadDeckWeak(
   });
   (kanji ?? []).forEach(k => {
     if (k.manualWeak || k.wrongCount >= WEAK_THRESHOLD) items.push(buildCardFromKanji(k));
+  });
+  (grammar ?? []).forEach(g => {
+    if (g.manualWeak || g.wrongCount >= WEAK_THRESHOLD) items.push(buildCardFromGrammar(g));
   });
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
 }
@@ -281,6 +287,7 @@ export default function Study() {
   clearSessionMutateRef.current = clearSessionMutateFn;
   const updateWord = useUpdateWord();
   const updateKanji = useUpdateKanji();
+  const updateGrammar = useUpdateGrammar();
   const recordWordWrongMutate = useRecordWordWrong();
   const recordKanjiWrongMutate = useRecordKanjiWrong();
   const recordWordEasyMutate = useRecordWordEasy();
@@ -368,26 +375,22 @@ export default function Study() {
         ...(newWrongCount !== undefined ? { wrongCount: newWrongCount } : {}),
       };
 
+      const onSuccessInvalidate = (key: readonly unknown[]) => () => {
+        queryClient.invalidateQueries({ queryKey: key });
+        queryClient.invalidateQueries({ queryKey: getGetWeakItemsQueryKey() });
+      };
       if (card.type === "word") {
-        updateWord.mutate({ id: card.id, data: updatePayload }, {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getListWordsQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getGetWeakItemsQueryKey() });
-          },
-        });
+        updateWord.mutate({ id: card.id, data: updatePayload }, { onSuccess: onSuccessInvalidate(getListWordsQueryKey()) });
+      } else if (card.type === "kanji") {
+        updateKanji.mutate({ id: card.id, data: updatePayload }, { onSuccess: onSuccessInvalidate(getListKanjiQueryKey()) });
       } else {
-        updateKanji.mutate({ id: card.id, data: updatePayload }, {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getListKanjiQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getGetWeakItemsQueryKey() });
-          },
-        });
+        updateGrammar.mutate({ id: card.id, data: updatePayload }, { onSuccess: onSuccessInvalidate(getListGrammarQueryKey()) });
       }
       return prev.map((c, i) =>
         i === currentIdx ? { ...c, manualWeak: newManualWeak, ...(newWrongCount !== undefined ? { wrongCount: newWrongCount } : {}) } : c
       );
     });
-  }, [currentIdx, updateWord, updateKanji, queryClient]);
+  }, [currentIdx, updateWord, updateKanji, updateGrammar, queryClient]);
 
   const handleEdit = useCallback(() => {
     const card = deck[currentIdx];
@@ -470,7 +473,7 @@ export default function Study() {
   useEffect(() => {
     if (deckKey === 0) return;
     const newDeck = weakMode
-      ? loadDeckWeak(wordsRef.current, kanjiRef.current)
+      ? loadDeckWeak(wordsRef.current, kanjiRef.current, grammarRef.current)
       : loadDeck(wordsRef.current, kanjiRef.current, grammarRef.current, includeRef.current, grammarLevelsRef.current, cardRangeRef.current, orderModeRef.current);
     setDeck(newDeck);
     setCurrentIdx(0);
@@ -992,7 +995,7 @@ export default function Study() {
               manualWeak={card.manualWeak}
               jlptLevel={card.jlptLevel}
               isFlipped={isFlipped}
-              onToggleWeak={card.type === "grammar" ? undefined : handleToggleWeak}
+              onToggleWeak={handleToggleWeak}
               onEdit={card.type === "grammar" ? undefined : handleEdit}
             />
           </div>

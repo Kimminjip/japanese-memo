@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import {
   useListWords, useListKanji, useListGrammar,
   useDeleteWord, useDeleteKanji, useDeleteGrammar,
-  useUpdateWord, useUpdateKanji,
+  useUpdateWord, useUpdateKanji, useUpdateGrammar,
   useMarkWordStudied, useMarkKanjiStudied, useMarkGrammarStudied,
   useSpeakJapanese,
   getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, getGetStatsSummaryQueryKey,
@@ -34,6 +34,7 @@ function CardListItem({
 }) {
   const updateWord = useUpdateWord();
   const updateKanji = useUpdateKanji();
+  const updateGrammar = useUpdateGrammar();
   const markWordStudied = useMarkWordStudied();
   const markKanjiStudied = useMarkKanjiStudied();
   const markGrammarStudied = useMarkGrammarStudied();
@@ -59,24 +60,19 @@ function CardListItem({
   const handleToggleWeak = useCallback(() => {
     const isWeak = item.manualWeak || item.wrongCount >= WEAK_THRESHOLD;
     const newManualWeak = !isWeak;
+    const done = (key: readonly unknown[]) => {
+      queryClient.invalidateQueries({ queryKey: key });
+      queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
+      toast({ title: newManualWeak ? "★ 취약 항목으로 등록했습니다." : "취약 항목에서 해제했습니다." });
+    };
     if (item.cardType === "word") {
-      updateWord.mutate({ id: item.id, data: { manualWeak: newManualWeak } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListWordsQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
-          toast({ title: newManualWeak ? "★ 취약 항목으로 등록했습니다." : "취약 항목에서 해제했습니다." });
-        },
-      });
+      updateWord.mutate({ id: item.id, data: { manualWeak: newManualWeak } }, { onSuccess: () => done(getListWordsQueryKey()) });
+    } else if (item.cardType === "kanji") {
+      updateKanji.mutate({ id: item.id, data: { manualWeak: newManualWeak } }, { onSuccess: () => done(getListKanjiQueryKey()) });
     } else {
-      updateKanji.mutate({ id: item.id, data: { manualWeak: newManualWeak } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListKanjiQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
-          toast({ title: newManualWeak ? "★ 취약 항목으로 등록했습니다." : "취약 항목에서 해제했습니다." });
-        },
-      });
+      updateGrammar.mutate({ id: item.id, data: { manualWeak: newManualWeak } }, { onSuccess: () => done(getListGrammarQueryKey()) });
     }
-  }, [item, updateWord, updateKanji, queryClient, toast]);
+  }, [item, updateWord, updateKanji, updateGrammar, queryClient, toast]);
 
   const handleMarkStudied = useCallback(() => {
     const done = (key: readonly unknown[]) => {
@@ -162,9 +158,12 @@ function CardListItem({
           example={item.example}
           exampleKorean={item.exampleKorean}
           exampleHighlight={item.exampleHighlight}
+          wrongCount={item.wrongCount}
+          manualWeak={item.manualWeak}
           jlptLevel={item.jlptLevel}
           isFlipped={isFlipped}
           onFlip={handleFlip}
+          onToggleWeak={handleToggleWeak}
           onSpeak={item.example ? () => speakJapanese(item.example) : undefined}
         />
       )}

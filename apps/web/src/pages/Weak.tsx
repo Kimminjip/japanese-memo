@@ -1,4 +1,4 @@
-import { useGetWeakItems, getGetStatsSummaryQueryKey, getGetWeakItemsQueryKey, getListWordsQueryKey, getListKanjiQueryKey, useUpdateWord, useUpdateKanji } from "@workspace/api-client-react";
+import { useGetWeakItems, getGetStatsSummaryQueryKey, getGetWeakItemsQueryKey, getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, useUpdateWord, useUpdateKanji, useUpdateGrammar } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,18 @@ export default function Weak() {
   const { toast } = useToast();
   const updateWord = useUpdateWord();
   const updateKanji = useUpdateKanji();
+  const updateGrammar = useUpdateGrammar();
+
+  const handleResetGrammar = (id: number) => {
+    updateGrammar.mutate({ id, data: { wrongCount: 0, manualWeak: false } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetWeakItemsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListGrammarQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
+        toast({ title: "취약 항목에서 해제했습니다." });
+      },
+    });
+  };
 
   const handleResetWord = (id: number) => {
     updateWord.mutate({ id, data: { wrongCount: 0, manualWeak: false } }, {
@@ -50,7 +62,8 @@ export default function Weak() {
 
   const hasWeakWords = data?.words && data.words.length > 0;
   const hasWeakKanji = data?.kanji && data.kanji.length > 0;
-  const totalWeak = (data?.words?.length || 0) + (data?.kanji?.length || 0);
+  const hasWeakGrammar = data?.grammar && data.grammar.length > 0;
+  const totalWeak = (data?.words?.length || 0) + (data?.kanji?.length || 0) + (data?.grammar?.length || 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -60,7 +73,7 @@ export default function Weak() {
             <AlertCircle className="h-8 w-8" />
             취약 항목
           </h1>
-          <p className="text-muted-foreground mt-1">3번 이상 틀렸거나 수동으로 등록한 단어·한자입니다.</p>
+          <p className="text-muted-foreground mt-1">3번 이상 틀렸거나 수동으로 등록한 단어·한자·문법입니다.</p>
         </div>
 
         {totalWeak > 0 && (
@@ -197,6 +210,46 @@ export default function Weak() {
             ) : (
               <p className="text-muted-foreground py-8 text-center bg-muted/20 rounded-lg">취약 한자가 없습니다.</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {totalWeak > 0 && hasWeakGrammar && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold border-b pb-2 border-border flex justify-between">
+            <span>문법</span>
+            <span className="text-muted-foreground text-sm font-normal">{data?.grammar?.length || 0}개</span>
+          </h2>
+          <div className="grid md:grid-cols-2 gap-3">
+            {data!.grammar!.map(g => (
+              <Card key={g.id} className="border-destructive/20 bg-destructive/5 shadow-sm">
+                <CardContent className="p-4 flex justify-between items-start gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-serif text-xl font-bold text-foreground break-words">{g.pattern}</span>
+                      {g.wrongCount > 0 && (
+                        <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full font-bold shrink-0">{g.wrongCount}회 오답</span>
+                      )}
+                      {g.manualWeak && (
+                        <span className="bg-amber-400/20 text-amber-600 text-xs px-2 py-0.5 rounded-full font-bold shrink-0">★ 수동 등록</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium break-keep">{g.meaning}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
+                    title="취약 항목 해제"
+                    onClick={() => handleResetGrammar(g.id)}
+                    disabled={updateGrammar.isPending}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    해제
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       )}

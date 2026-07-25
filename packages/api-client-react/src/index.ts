@@ -88,6 +88,7 @@ export interface StatsSummary {
 export interface WeakItems {
   words: Word[];
   kanji: Kanji[];
+  grammar?: Grammar[];
 }
 
 export interface StudySessionItem {
@@ -272,7 +273,7 @@ export function useCreateGrammar() {
 }
 
 export function useUpdateGrammar() {
-  return useMutation<Grammar, Error, { id: number; data: Partial<{ pattern: string; meaning: string; formation: string; example: string; exampleKorean: string; exampleHighlight: string | null; jlptLevel: string | null }> }>({
+  return useMutation<Grammar, Error, { id: number; data: Partial<{ pattern: string; meaning: string; formation: string; example: string; exampleKorean: string; exampleHighlight: string | null; jlptLevel: string | null; wrongCount: number; manualWeak: boolean }> }>({
     mutationFn: async ({ id, data }) => {
       const res = await api.put(`/grammar/${id}`, data);
       return res.data;

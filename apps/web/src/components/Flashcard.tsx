@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Star, Pencil, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,30 +26,31 @@ interface FlashcardProps {
   onSpeak?: () => void;
 }
 
-// 예문에서 highlight 영역 전체에 밑줄, 그 안에서 문형(pattern) 부분만 굵게
+// 예문에서 "문형(pattern) 부분만" 굵게+밑줄. 나머지(예: 来)는 강조 없음.
+// 문형 핵심(물결 제거)을 예문에서 찾고, 못 찾으면 저장된 highlight로 폴백.
 function renderHighlighted(example: string, highlight?: string | null, pattern?: string) {
-  if (!highlight || !example.includes(highlight)) return example;
-  const idx = example.indexOf(highlight);
-  const before = example.slice(0, idx);
-  const after = example.slice(idx + highlight.length);
-  const underlineCls = "underline decoration-primary decoration-2 underline-offset-4";
-
-  // 문형에서 물결(〜/～/~) 등 장식 제거 → 핵심 표현
   const core = (pattern ?? "").replace(/[〜～~\s]/g, "").trim();
-  let inner: ReactNode;
-  if (core && highlight.includes(core)) {
-    const ci = highlight.indexOf(core);
-    inner = (
-      <span className={underlineCls}>
-        {highlight.slice(0, ci)}
-        <span className="font-bold">{core}</span>
-        {highlight.slice(ci + core.length)}
-      </span>
-    );
-  } else {
-    inner = <span className={cn(underlineCls, "font-bold")}>{highlight}</span>;
-  }
-  return <>{before}{inner}{after}</>;
+  let target = "";
+  if (core && example.includes(core)) target = core;
+  else if (highlight && example.includes(highlight)) target = highlight;
+  if (!target) return example;
+
+  const idx = example.indexOf(target);
+  return (
+    <>
+      {example.slice(0, idx)}
+      <span className="font-bold underline decoration-primary decoration-2 underline-offset-4">{target}</span>
+      {example.slice(idx + target.length)}
+    </>
+  );
+}
+
+function getGrammarFrontFontClass(text: string): string {
+  const len = text.length;
+  if (len <= 6)  return "text-3xl sm:text-4xl lg:text-5xl";
+  if (len <= 10) return "text-2xl sm:text-3xl lg:text-4xl";
+  if (len <= 16) return "text-xl sm:text-2xl lg:text-3xl";
+  return "text-lg sm:text-xl lg:text-2xl";
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -211,11 +212,12 @@ export function Flashcard({
             )}
             <span
               className={cn(
-                "font-serif font-medium text-foreground break-keep px-2",
+                "font-serif font-medium text-foreground px-3 text-center",
+                type === "grammar" ? "break-words" : "break-keep",
                 type === "word"
                   ? "text-4xl sm:text-5xl lg:text-7xl"
                   : type === "grammar"
-                  ? "text-3xl sm:text-4xl lg:text-5xl"
+                  ? getGrammarFrontFontClass(japanese)
                   : "text-6xl sm:text-7xl lg:text-9xl"
               )}
             >

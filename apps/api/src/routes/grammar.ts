@@ -24,6 +24,8 @@ const UpdateBody = z.object({
   exampleKorean: z.string().optional(),
   exampleHighlight: z.string().optional().nullable(),
   jlptLevel: z.string().optional().nullable(),
+  wrongCount: z.number().optional(),
+  manualWeak: z.boolean().optional(),
 });
 const IdParam = z.object({ id: z.coerce.number() });
 
@@ -86,6 +88,8 @@ router.put("/grammar/:id", async (req, res): Promise<void> => {
   if (parsed.data.exampleKorean !== undefined) d.exampleKorean = parsed.data.exampleKorean;
   if ("exampleHighlight" in parsed.data) d.exampleHighlight = parsed.data.exampleHighlight ?? null;
   if ("jlptLevel" in parsed.data) d.jlptLevel = parsed.data.jlptLevel ?? null;
+  if (parsed.data.wrongCount !== undefined) d.wrongCount = parsed.data.wrongCount;
+  if (parsed.data.manualWeak !== undefined) d.manualWeak = parsed.data.manualWeak;
 
   const [row] = await db.update(grammarTable).set(d).where(eq(grammarTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Grammar not found" }); return; }

@@ -355,6 +355,21 @@ export const GetWeakItemsResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  grammar: zod.array(
+    zod.object({
+      id: zod.number(),
+      pattern: zod.string(),
+      meaning: zod.string(),
+      formation: zod.string(),
+      example: zod.string(),
+      exampleKorean: zod.string(),
+      exampleHighlight: zod.string().nullish(),
+      wrongCount: zod.number(),
+      manualWeak: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      jlptLevel: zod.string().nullish(),
+    }),
+  ).optional(),
 });
 
 /**
@@ -366,7 +381,7 @@ export const GetStudySessionResponse = zod.object({
       deckIds: zod.array(
         zod.object({
           id: zod.number(),
-          type: zod.enum(["word", "kanji"]),
+          type: zod.enum(["word", "kanji", "grammar"]),
         }),
       ),
       currentIdx: zod.number(),
@@ -390,7 +405,7 @@ export const SaveStudySessionBody = zod.object({
   deckIds: zod.array(
     zod.object({
       id: zod.number(),
-      type: zod.enum(["word", "kanji"]),
+      type: zod.enum(["word", "kanji", "grammar"]),
     }),
   ),
   currentIdx: zod.number(),
@@ -411,7 +426,7 @@ export const SaveStudySessionResponse = zod.object({
       deckIds: zod.array(
         zod.object({
           id: zod.number(),
-          type: zod.enum(["word", "kanji"]),
+          type: zod.enum(["word", "kanji", "grammar"]),
         }),
       ),
       currentIdx: zod.number(),

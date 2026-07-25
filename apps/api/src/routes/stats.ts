@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { gte, count, sql } from "drizzle-orm";
-import { db, wordsTable, kanjiTable, studyActivityTable } from "@workspace/db";
+import { db, wordsTable, kanjiTable, grammarTable, studyActivityTable } from "@workspace/db";
 import { GetStatsSummaryResponse, GetWeakItemsResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -107,8 +107,9 @@ router.get("/stats/activity", async (req, res): Promise<void> => {
 router.get("/stats/weak", async (req, res): Promise<void> => {
   const words = await db.select().from(wordsTable).where(sql`${wordsTable.wrongCount} >= ${WEAK_THRESHOLD} OR ${wordsTable.manualWeak} = true`);
   const kanjiList = await db.select().from(kanjiTable).where(sql`${kanjiTable.wrongCount} >= ${WEAK_THRESHOLD} OR ${kanjiTable.manualWeak} = true`);
+  const grammarList = await db.select().from(grammarTable).where(sql`${grammarTable.wrongCount} >= ${WEAK_THRESHOLD} OR ${grammarTable.manualWeak} = true`);
 
-  res.json(GetWeakItemsResponse.parse({ words, kanji: kanjiList }));
+  res.json(GetWeakItemsResponse.parse({ words, kanji: kanjiList, grammar: grammarList }));
 });
 
 export default router;
