@@ -39,7 +39,7 @@ function renderHighlighted(example: string, highlight?: string | null, pattern?:
   return (
     <>
       {example.slice(0, idx)}
-      <span className="font-bold underline decoration-primary decoration-2 underline-offset-4">{target}</span>
+      <span className="font-bold">{target}</span>
       {example.slice(idx + target.length)}
     </>
   );
