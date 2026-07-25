@@ -591,23 +591,42 @@ export default function Study() {
 
   const flipCard = useCallback(() => setIsFlipped(f => !f), []);
 
-  // 카드 앞면 표시 시 TTS 자동재생 (전체 자동재생 모드일 때는 그쪽에서 처리)
+  // 카드 앞면 표시 시 TTS 재생 (전체 자동재생 모드일 때는 그쪽에서 처리)
   useEffect(() => {
     if (!ttsEnabled || autoplay || deck.length === 0) return;
     const card = deck[currentIdx];
     if (!card) return;
-    let text = "";
+    const TILDE = /[〜～~]/g;
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+    const steps: { text: string; lang: "ja" | "ko" }[] = [];
     if (card.type === "word") {
-      // 후리가나가 있으면 정확한 발음을 위해 우선 사용 (한자 원문은 Google TTS가 잘못 읽을 수 있음)
-      text = (card.furigana ?? "").trim() || card.japanese;
+      // 일본어(후리가나 우선) → 한국어 첫 뜻
+      steps.push({ text: (card.furigana ?? "").trim() || card.japanese, lang: "ja" });
+      steps.push({ text: (card.korean ?? "").split("\n")[0]?.trim() ?? "", lang: "ko" });
     } else if (card.type === "grammar") {
-      text = (card.example ?? "").trim() || card.japanese;
+      // 문형 → 의미(한국어, '~'는 "무엇")
+      steps.push({ text: (card.japanese ?? "").replace(TILDE, "").trim(), lang: "ja" });
+      steps.push({ text: (card.korean ?? "").replace(TILDE, "무엇").trim(), lang: "ko" });
     } else {
+      // 한자: 훈독、음독 (일본어)
       const kun = (card.kunyomi ?? "").split("\n")[0].trim();
       const on = (card.onyomi ?? "").split("\n")[0].trim();
-      text = [kun, on].filter(Boolean).join("、");
+      steps.push({ text: [kun, on].filter(Boolean).join("、"), lang: "ja" });
     }
-    if (text) speakJapanese(text);
+
+    let cancelled = false;
+    (async () => {
+      for (const s of steps) {
+        if (cancelled) return;
+        const t = s.text.trim();
+        if (!t) continue;
+        await speakJapanese(t, s.lang);
+        if (cancelled) return;
+        await sleep(250);
+      }
+    })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, deck.length, ttsEnabled, autoplay]);
 
