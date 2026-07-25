@@ -130,6 +130,15 @@ function buildCardFromGrammar(g: any): StudyCard {
   return { id: g.id, type: "grammar", japanese: g.pattern, korean: g.meaning, formation: g.formation, example: g.example, exampleKorean: g.exampleKorean, exampleHighlight: g.exampleHighlight, wrongCount: g.wrongCount, manualWeak: g.manualWeak, jlptLevel: g.jlptLevel };
 }
 
+// TTS용: 괄호(반각/전각) 안 내용 제거 후 정리
+function stripParens(s: string): string {
+  return s
+    .replace(/（[^）]*）/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function difficultyWeight(wrongCount: number | undefined, manualWeak: boolean | undefined): number {
   return (wrongCount ?? 0) * 2 + (manualWeak ? 5 : 0) + 1;
 }
@@ -619,7 +628,7 @@ export default function Study() {
     (async () => {
       for (const s of steps) {
         if (cancelled) return;
-        const t = s.text.trim();
+        const t = stripParens(s.text);
         if (!t) continue;
         await speakJapanese(t, s.lang);
         if (cancelled) return;
@@ -709,7 +718,7 @@ export default function Study() {
     const playSteps = async (steps: { text: string; lang: "ja" | "ko" }[]) => {
       for (const s of steps) {
         if (!stillActive()) return;
-        const t = s.text.trim();
+        const t = stripParens(s.text);
         if (!t) continue;
         await speakJapanese(t, s.lang);
         if (!stillActive()) return;
@@ -741,7 +750,7 @@ export default function Study() {
         // 한자: 훈독、음독 2회 반복 (1초 pause)
         const kun = (card.kunyomi ?? "").split("\n")[0].trim();
         const on = (card.onyomi ?? "").split("\n")[0].trim();
-        const text = [kun, on].filter(Boolean).join("、");
+        const text = stripParens([kun, on].filter(Boolean).join("、"));
         if (text) await speakJapanese(text, "ja");
         if (!stillActive()) return;
         await sleep(1000);
