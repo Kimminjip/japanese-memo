@@ -14,6 +14,7 @@ export const kanjiTable = pgTable("kanji", {
   studiedAt: timestamp("studied_at"),
   jlptLevel: text("jlpt_level"),
   distractors: jsonb("distractors").$type<string[]>(),
+  grade: integer("grade"),  // 초등 교육한자 학년(1~6), 없으면 null
 }, (table) => [uniqueIndex("kanji_character_unique").on(table.character)]);
 
 export const insertKanjiSchema = createInsertSchema(kanjiTable).omit({ id: true, wrongCount: true, createdAt: true, studiedAt: true, jlptLevel: true, distractors: true });
