@@ -8,7 +8,6 @@ import ttsRouter from "./tts";
 import aiRouter from "./ai";
 import grammarRouter from "./grammar";
 import srsRouter from "./srs";
-import adminImportRouter from "./admin-import";
 
 const router: IRouter = Router();
 
@@ -21,6 +20,5 @@ router.use(studySessionRouter);
 router.use(ttsRouter);
 router.use(aiRouter);
 router.use(srsRouter);
-router.use(adminImportRouter);
 
 export default router;
