@@ -29,7 +29,7 @@ function wordCard(w: any) {
     front: w.japanese,
     furigana: w.furigana ?? null,
     back: w.korean,
-    grade: null as number | null,
+    jlptLevel: w.jlptLevel ?? null,
   };
 }
 function kanjiCard(k: any) {
@@ -41,13 +41,13 @@ function kanjiCard(k: any) {
     front: k.character,
     furigana: null as string | null,
     back,
-    grade: k.grade ?? null,
+    jlptLevel: k.jlptLevel ?? null,
   };
 }
 
 const QueueQuery = z.object({
   types: z.string().optional(),        // "word,kanji"
-  grades: z.string().optional(),       // "1,2,3" (kanji only)
+  levels: z.string().optional(),       // "N5,N4,N3,N2,N1"
   newLimit: z.coerce.number().int().min(0).max(200).optional(),
 });
 
@@ -58,7 +58,8 @@ router.get("/srs/queue", async (req, res): Promise<void> => {
   const types = (q.data.types ?? "word,kanji").split(",").map(s => s.trim()).filter(Boolean);
   const includeWord = types.includes("word");
   const includeKanji = types.includes("kanji");
-  const grades = (q.data.grades ?? "").split(",").map(s => Number(s.trim())).filter(n => n >= 1 && n <= 6);
+  const VALID_LEVELS = ["N5", "N4", "N3", "N2", "N1"];
+  const levels = (q.data.levels ?? "").split(",").map(s => s.trim().toUpperCase()).filter(l => VALID_LEVELS.includes(l));
   const newLimit = q.data.newLimit ?? 10;
   const today = todayKst();
 
@@ -68,9 +69,12 @@ router.get("/srs/queue", async (req, res): Promise<void> => {
   for (const s of states) stateMap.set(`${s.cardType}:${s.cardId}`, s);
 
   // 대상 카드 로드
-  const words = includeWord ? await db.select().from(wordsTable) : [];
+  let words = includeWord ? await db.select().from(wordsTable) : [];
   let kanji = includeKanji ? await db.select().from(kanjiTable) : [];
-  if (includeKanji && grades.length > 0) kanji = kanji.filter(k => k.grade != null && grades.includes(k.grade));
+  if (levels.length > 0) {
+    words = words.filter(w => w.jlptLevel != null && levels.includes(w.jlptLevel));
+    kanji = kanji.filter(k => k.jlptLevel != null && levels.includes(k.jlptLevel));
+  }
 
   const cards = [
     ...words.map(wordCard),

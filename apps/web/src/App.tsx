@@ -9,6 +9,7 @@ import Cards from "@/pages/Cards";
 import Add from "@/pages/Add";
 import Quiz from "@/pages/Quiz";
 import Study from "@/pages/Study";
+import Srs from "@/pages/Srs";
 import Stats from "@/pages/Stats";
 import Weak from "@/pages/Weak";
 import NotFound from "@/pages/not-found";
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/add" component={Add} />
         <Route path="/quiz" component={Quiz} />
         <Route path="/study" component={Study} />
+        <Route path="/srs" component={Srs} />
         <Route path="/stats" component={Stats} />
         <Route path="/weak" component={Weak} />
         <Route component={NotFound} />

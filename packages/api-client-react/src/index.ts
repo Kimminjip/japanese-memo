@@ -311,6 +311,64 @@ export function useLookupGrammar() {
   });
 }
 
+// ─── SRS ───────────────────────────────────────────────────────────────────────
+
+export type SrsRating = "again" | "hard" | "good";
+
+export interface SrsQueueCard {
+  cardType: "word" | "kanji";
+  cardId: number;
+  type: "word" | "kanji";
+  front: string;
+  furigana: string | null;
+  back: string;
+  jlptLevel: string | null;
+  isNew: boolean;
+  state: { interval: number; ease: number; reps: number; lapses: number };
+}
+
+export interface SrsQueue {
+  today: string;
+  reviewCount: number;
+  newCount: number;
+  newAvailable: number;
+  queue: SrsQueueCard[];
+}
+
+export function useGetSrsQueue(
+  params?: { types?: string; levels?: string; newLimit?: number },
+  options?: Partial<UseQueryOptions<SrsQueue>>
+) {
+  return useQuery<SrsQueue>({
+    queryKey: ["srs", "queue", params] as const,
+    queryFn: async () => {
+      const { data } = await api.get("/srs/queue", { params });
+      return data;
+    },
+    staleTime: 0,
+    ...options,
+  });
+}
+
+export function useGradeSrs() {
+  return useMutation<
+    { cardType: string; cardId: number; interval: number; ease: number; reps: number; lapses: number; nextReview: string },
+    Error,
+    { cardType: "word" | "kanji"; cardId: number; rating: SrsRating }
+  >({
+    mutationFn: async (body) => (await api.post("/srs/grade", body)).data,
+  });
+}
+
+export interface SrsStats { today: string; due: number; learning: number }
+export function useGetSrsStats(options?: Partial<UseQueryOptions<SrsStats>>) {
+  return useQuery<SrsStats>({
+    queryKey: ["srs", "stats"] as const,
+    queryFn: async () => (await api.get("/srs/stats")).data,
+    ...options,
+  });
+}
+
 // ─── Stats ─────────────────────────────────────────────────────────────────────
 
 export function useGetStatsSummary(options?: Partial<UseQueryOptions<StatsSummary>>) {
