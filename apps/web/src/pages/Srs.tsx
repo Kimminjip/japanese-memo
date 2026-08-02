@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, RotateCcw, Shuffle } from "lucide-react";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const NEW_LIMIT_KEY = "srs_new_limit";
@@ -31,6 +31,12 @@ export default function Srs() {
   const [idx, setIdx] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState(0);
+  // 이번 세션에 나온 카드 모음 (완료 후 다시 복습용)
+  const [sessionCards, setSessionCards] = useState<SrsQueueCard[]>([]);
+  // 세션 복습 덱 (플립 넘김)
+  const [reviewDeck, setReviewDeck] = useState<SrsQueueCard[] | null>(null);
+  const [reviewIdx, setReviewIdx] = useState(0);
+  const [reviewFlipped, setReviewFlipped] = useState(false);
 
   useEffect(() => {
     if (started && data) {
@@ -38,6 +44,8 @@ export default function Srs() {
       setIdx(0);
       setRevealed(false);
       setDone(0);
+      setSessionCards([]);
+      setReviewDeck(null);
     }
   }, [started, data]);
 
@@ -48,10 +56,18 @@ export default function Srs() {
   const handleGrade = useCallback((rating: SrsRating) => {
     if (!card) return;
     grade.mutate({ cardType: card.cardType, cardId: card.cardId, rating });
+    setSessionCards(prev => [...prev, card]);
     setDone(d => d + 1);
     setRevealed(false);
     setIdx(i => i + 1);
   }, [card, grade]);
+
+  const startReviewDeck = useCallback((shuffleDeck: boolean) => {
+    const deck = shuffleDeck ? [...sessionCards].sort(() => Math.random() - 0.5) : sessionCards;
+    setReviewDeck(deck);
+    setReviewIdx(0);
+    setReviewFlipped(false);
+  }, [sessionCards]);
 
   // 키보드: space=공개, 1/2/3=모름/애매/알아
   useEffect(() => {
@@ -128,6 +144,45 @@ export default function Srs() {
     );
   }
 
+  // ── 세션 복습 덱 (플립 넘김) ──
+  if (reviewDeck) {
+    const rc = reviewDeck[reviewIdx];
+    if (!rc) { setReviewDeck(null); return null; }
+    const rKanji = rc.type === "kanji";
+    const goNextReview = () => {
+      if (reviewIdx + 1 >= reviewDeck.length) setReviewDeck(null);
+      else { setReviewIdx(i => i + 1); setReviewFlipped(false); }
+    };
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 select-none">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">세션 복습 <b className="text-foreground">{reviewIdx + 1}</b> / {reviewDeck.length}</span>
+          <button onClick={() => setReviewDeck(null)} className="text-muted-foreground hover:text-foreground">그만두기</button>
+        </div>
+        <div
+          className="bg-card rounded-xl border shadow-sm min-h-[16rem] sm:min-h-[20rem] flex flex-col items-center justify-center p-8 text-center cursor-pointer relative"
+          onClick={() => setReviewFlipped(f => !f)}
+        >
+          {rc.jlptLevel && <span className="absolute top-3 left-3 text-xs text-muted-foreground/60">{rc.jlptLevel}</span>}
+          {rc.type === "word" && rc.furigana && (
+            <span className="font-serif text-muted-foreground text-base mb-1">{rc.furigana}</span>
+          )}
+          <span className={cn("font-serif font-medium text-foreground break-keep", rKanji ? "text-7xl sm:text-9xl" : "text-4xl sm:text-6xl")}>{rc.front}</span>
+          {reviewFlipped && (
+            <div className="mt-6 pt-6 border-t w-full">
+              <span className="text-xl sm:text-2xl font-medium break-keep whitespace-pre-line">{rc.back}</span>
+            </div>
+          )}
+          {!reviewFlipped && <span className="absolute bottom-4 text-xs text-muted-foreground/50">탭 → 뒤집기</span>}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" disabled={reviewIdx === 0} onClick={() => { setReviewIdx(i => Math.max(0, i - 1)); setReviewFlipped(false); }}>이전</Button>
+          <Button className="flex-1" onClick={goNextReview}>{reviewIdx + 1 >= reviewDeck.length ? "끝내기" : "다음"}</Button>
+        </div>
+      </div>
+    );
+  }
+
   // ── 로딩 ──
   if (isLoading || (isFetching && queue.length === 0)) {
     return (
@@ -145,8 +200,21 @@ export default function Srs() {
         <div className="text-5xl">🎉</div>
         <h2 className="text-2xl font-bold">오늘 복습 완료!</h2>
         <p className="text-muted-foreground">{done}장을 학습했습니다.</p>
+        {sessionCards.length > 0 && (
+          <div className="flex flex-col items-center gap-2 w-full max-w-sm">
+            <p className="text-sm text-muted-foreground">이번 세션에 나온 {sessionCards.length}장을 다시 넘겨보며 복습하기</p>
+            <div className="flex gap-2 w-full">
+              <Button className="flex-1 gap-2" onClick={() => startReviewDeck(false)}>
+                <RotateCcw className="h-4 w-4" /> 순서대로
+              </Button>
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => startReviewDeck(true)}>
+                <Shuffle className="h-4 w-4" /> 섞어서
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { refetch().then(r => { if (r.data) { setQueue(r.data.queue); setIdx(0); setRevealed(false); } }); }} className="gap-2">
+          <Button variant="outline" onClick={() => { refetch().then(r => { if (r.data) { setQueue(r.data.queue); setIdx(0); setRevealed(false); setSessionCards([]); } }); }} className="gap-2">
             <RefreshCw className="h-4 w-4" /> 더 있는지 확인
           </Button>
           <Button variant="ghost" onClick={() => setStarted(false)}>설정으로</Button>
