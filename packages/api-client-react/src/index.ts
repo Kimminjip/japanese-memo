@@ -361,6 +361,31 @@ export function useGradeSrs() {
   });
 }
 
+export interface SrsSessionData {
+  cards: SrsQueueCard[];
+  idx: number;
+  savedAt: number;
+  today: string;
+}
+export function useGetSrsSession() {
+  return useQuery<{ session: SrsSessionData | null }>({
+    queryKey: ["srs", "session"] as const,
+    queryFn: async () => (await api.get("/srs/session")).data,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+export function useSaveSrsSession() {
+  return useMutation<void, Error, { data: SrsSessionData }>({
+    mutationFn: async ({ data }) => { await api.put("/srs/session", { data }); },
+  });
+}
+export function useClearSrsSession() {
+  return useMutation<void, Error, void>({
+    mutationFn: async () => { await api.delete("/srs/session"); },
+  });
+}
+
 export interface SrsStats { today: string; due: number; learning: number }
 export function useGetSrsStats(options?: Partial<UseQueryOptions<SrsStats>>) {
   return useQuery<SrsStats>({

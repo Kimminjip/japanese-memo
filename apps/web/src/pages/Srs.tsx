@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { useGetSrsQueue, useGradeSrs, useSpeakJapanese, type SrsQueueCard, type SrsRating } from "@workspace/api-client-react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useGetSrsQueue, useGradeSrs, useSpeakJapanese, useGetSrsSession, useSaveSrsSession, useClearSrsSession, type SrsQueueCard, type SrsRating } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX } from "lucide-react";
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const NEW_LIMIT_KEY = "srs_new_limit";
 const TTS_KEY = "srs-tts";
+const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
 export default function Srs() {
   const [includeWord, setIncludeWord] = useState(true);
@@ -17,6 +18,7 @@ export default function Srs() {
   const [levels, setLevels] = useState<Record<string, boolean>>({ N5: true, N4: true, N3: true, N2: true, N1: true });
   const [newLimit, setNewLimit] = useState(() => Number(localStorage.getItem(NEW_LIMIT_KEY)) || 100);
   const [started, setStarted] = useState(false);
+  const [resumed, setResumed] = useState(false); // 저장된 세션에서 이어받음
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem(TTS_KEY) !== "off");
   const speakJapanese = useSpeakJapanese();
 
@@ -26,8 +28,12 @@ export default function Srs() {
     return { types, levels: lv, newLimit };
   }, [includeWord, includeKanji, levels, newLimit]);
 
-  const { data, isLoading, isFetching, refetch } = useGetSrsQueue(params, { enabled: started });
+  // 저장된 세션이 아닐 때만 새 큐를 불러온다
+  const { data, isLoading, isFetching, refetch } = useGetSrsQueue(params, { enabled: started && !resumed });
   const grade = useGradeSrs();
+  const { data: sessionResp, isLoading: sessionLoading } = useGetSrsSession();
+  const saveSession = useSaveSrsSession();
+  const clearSession = useClearSrsSession();
 
   // 현재 세션 큐 (한 번 불러오면 로컬에서 소비)
   const [queue, setQueue] = useState<SrsQueueCard[]>([]);
@@ -41,16 +47,38 @@ export default function Srs() {
   const [reviewIdx, setReviewIdx] = useState(0);
   const [reviewFlipped, setReviewFlipped] = useState(false);
 
+  const persist = useCallback((cards: SrsQueueCard[], i: number) => {
+    if (i >= cards.length) { clearSession.mutate(); return; }
+    saveSession.mutate({ data: { cards, idx: i, savedAt: Date.now(), today: kstToday() } });
+  }, [saveSession, clearSession]);
+
+  // 마운트 시 저장된 세션 있으면 이어받기 (기기 간)
+  const initRef = useRef(false);
   useEffect(() => {
-    if (started && data) {
+    if (initRef.current || sessionLoading) return;
+    initRef.current = true;
+    const s = sessionResp?.session;
+    if (s && s.today === kstToday() && Array.isArray(s.cards) && s.idx < s.cards.length) {
+      setResumed(true);
+      setQueue(s.cards);
+      setIdx(s.idx);
+      setSessionCards(s.cards.slice(0, s.idx));
+      setStarted(true);
+    }
+  }, [sessionResp, sessionLoading]);
+
+  // 새로 시작(저장 세션 아님)해서 큐가 도착하면 로드 + 세션 저장
+  useEffect(() => {
+    if (started && !resumed && data) {
       setQueue(data.queue);
       setIdx(0);
       setRevealed(false);
       setDone(0);
       setSessionCards([]);
       setReviewDeck(null);
+      persist(data.queue, 0);
     }
-  }, [started, data]);
+  }, [started, resumed, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const card = queue[idx];
   const remainingReview = queue.slice(idx).filter(c => !c.isNew).length;
@@ -62,8 +90,19 @@ export default function Srs() {
     setSessionCards(prev => [...prev, card]);
     setDone(d => d + 1);
     setRevealed(false);
-    setIdx(i => i + 1);
-  }, [card, grade]);
+    const newIdx = idx + 1;
+    setIdx(newIdx);
+    persist(queue, newIdx); // 한 장마다 세션 위치 저장 (기기 간 이어보기)
+  }, [card, grade, idx, queue, persist]);
+
+  const exitToSetup = useCallback(() => {
+    clearSession.mutate();
+    setStarted(false);
+    setResumed(false);
+    initRef.current = true; // 다시 자동 이어받기 방지
+    setQueue([]);
+    setIdx(0);
+  }, [clearSession]);
 
   const startReviewDeck = useCallback((shuffleDeck: boolean) => {
     const deck = shuffleDeck ? [...sessionCards].sort(() => Math.random() - 0.5) : sessionCards;
@@ -131,6 +170,11 @@ export default function Srs() {
 
   const toggleLevel = (l: string) => setLevels(p => ({ ...p, [l]: !p[l] }));
 
+  // 저장된 세션 확인 중이면 잠깐 대기 (설정 화면 깜빡임 방지)
+  if (!started && sessionLoading) {
+    return <div className="max-w-xl mx-auto"><Skeleton className="h-64 w-full rounded-xl" /></div>;
+  }
+
   // ── 설정 화면 ──
   if (!started) {
     return (
@@ -181,7 +225,7 @@ export default function Srs() {
           </div>
         </div>
 
-        <Button size="lg" className="w-full text-lg h-14" onClick={() => setStarted(true)} disabled={!includeWord && !includeKanji}>
+        <Button size="lg" className="w-full text-lg h-14" onClick={() => { setResumed(false); setStarted(true); }} disabled={!includeWord && !includeKanji}>
           복습 시작
         </Button>
       </div>
@@ -219,7 +263,7 @@ export default function Srs() {
           <span className={cn("font-serif font-medium text-foreground break-keep", rKanji ? "text-7xl sm:text-9xl" : "text-4xl sm:text-6xl")}>{rc.front}</span>
           {reviewFlipped && (
             <div className="mt-6 pt-6 border-t w-full">
-              <span className="text-xl sm:text-2xl font-medium break-keep whitespace-pre-line">{rc.back}</span>
+              <span className="font-serif text-xl sm:text-2xl font-medium break-keep whitespace-pre-line">{rc.back}</span>
             </div>
           )}
           {!reviewFlipped && <span className="absolute bottom-4 text-xs text-muted-foreground/50">탭 → 뒤집기</span>}
@@ -263,10 +307,10 @@ export default function Srs() {
           </div>
         )}
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { refetch().then(r => { if (r.data) { setQueue(r.data.queue); setIdx(0); setRevealed(false); setSessionCards([]); } }); }} className="gap-2">
+          <Button variant="outline" onClick={() => { setResumed(false); refetch().then(r => { if (r.data) { setQueue(r.data.queue); setIdx(0); setRevealed(false); setSessionCards([]); persist(r.data.queue, 0); } }); }} className="gap-2">
             <RefreshCw className="h-4 w-4" /> 더 있는지 확인
           </Button>
-          <Button variant="ghost" onClick={() => setStarted(false)}>설정으로</Button>
+          <Button variant="ghost" onClick={exitToSetup}>설정으로</Button>
         </div>
       </div>
     );
@@ -284,7 +328,7 @@ export default function Srs() {
           <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
             {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </button>
-          <button onClick={() => setStarted(false)} className="text-muted-foreground hover:text-foreground">설정</button>
+          <button onClick={exitToSetup} className="text-muted-foreground hover:text-foreground">설정</button>
         </div>
       </div>
 
@@ -304,7 +348,7 @@ export default function Srs() {
 
         {revealed && (
           <div className="mt-6 pt-6 border-t w-full">
-            <span className="text-xl sm:text-2xl font-medium break-keep whitespace-pre-line">{card.back}</span>
+            <span className="font-serif text-xl sm:text-2xl font-medium break-keep whitespace-pre-line">{card.back}</span>
           </div>
         )}
         {!revealed && <span className="absolute bottom-4 text-xs text-muted-foreground/50">탭 / Space 로 정답 보기</span>}

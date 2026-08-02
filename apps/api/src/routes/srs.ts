@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, lte, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db, srsStateTable, wordsTable, kanjiTable } from "@workspace/db";
+import { db, srsStateTable, wordsTable, kanjiTable, studySessionsTable } from "@workspace/db";
 import { schedule, newCore, nextReviewDate, type Rating, type SrsCore } from "../lib/srs";
 
 const router: IRouter = Router();
@@ -9,6 +9,10 @@ const router: IRouter = Router();
 // KST 기준 오늘 (YYYY-MM-DD)
 function todayKst(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+// 임의 타임스탬프의 KST 날짜
+function kstDateOf(ts: Date | string): string {
+  return new Date(new Date(ts).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -99,25 +103,33 @@ router.get("/srs/queue", async (req, res): Promise<void> => {
     ...kanji.map(kanjiCard),
   ];
 
+  // 오늘(KST) 이미 시작한 신규 수 = srs_state 행이 오늘 생성된 것 (기기 무관, DB 기준)
+  const startedToday = states.filter(s => kstDateOf(s.createdAt) === today).length;
+  const allowance = Math.max(0, newLimit - startedToday); // 오늘 더 낼 수 있는 "새" 카드 수
+
   const reviewCards: any[] = [];
-  const newCards: any[] = [];
+  const inProgressNew: any[] = [];  // 이미 srs 행이 있는 신규(reps 0) — 계속 진행
+  const freshNew: any[] = [];       // 아직 손대지 않은 신규 — 오늘 남은 allowance 만큼만
   for (const c of cards) {
     const st = stateMap.get(`${c.cardType}:${c.cardId}`);
-    if (!st || st.reps === 0) {
-      // 신규
-      newCards.push({ ...c, state: st ? core(st) : newCore(), isNew: true });
+    if (!st) {
+      freshNew.push({ ...c, state: newCore(), isNew: true });
+    } else if (st.reps === 0) {
+      inProgressNew.push({ ...c, state: core(st), isNew: true });
     } else if (st.nextReview <= today) {
-      // 복습 (기한 도래)
       reviewCards.push({ ...c, state: core(st), isNew: false });
     }
   }
 
-  const queue = [...shuffle(reviewCards), ...shuffle(newCards).slice(0, newLimit)];
+  const newSelected = [...shuffle(inProgressNew), ...shuffle(freshNew).slice(0, allowance)];
+  const queue = [...shuffle(reviewCards), ...newSelected];
   res.json({
     today,
     reviewCount: reviewCards.length,
-    newCount: Math.min(newCards.length, newLimit),
-    newAvailable: newCards.length,
+    newCount: newSelected.length,
+    newAvailable: freshNew.length + inProgressNew.length,
+    startedToday,
+    newLimit,
     queue,
   });
 });
@@ -170,6 +182,28 @@ router.get("/srs/stats", async (_req, res): Promise<void> => {
   const [learning] = await db.select({ c: sql<number>`count(*)` }).from(srsStateTable)
     .where(sql`${srsStateTable.reps} > 0`);
   res.json({ today, due: Number(due?.c ?? 0), learning: Number(learning?.c ?? 0) });
+});
+
+// ── 세션 이어보기 (기기 간 동기화) — study_sessions 테이블 key "srs" 재사용 ──
+const SRS_SESSION_KEY = "srs";
+
+router.get("/srs/session", async (_req, res): Promise<void> => {
+  const [row] = await db.select().from(studySessionsTable).where(eq(studySessionsTable.key, SRS_SESSION_KEY));
+  res.json({ session: row?.data ?? null });
+});
+
+router.put("/srs/session", async (req, res): Promise<void> => {
+  const data = req.body?.data;
+  if (data == null || typeof data !== "object") { res.status(400).json({ error: "data required" }); return; }
+  await db.insert(studySessionsTable)
+    .values({ key: SRS_SESSION_KEY, data, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: studySessionsTable.key, set: { data, updatedAt: new Date() } });
+  res.json({ ok: true });
+});
+
+router.delete("/srs/session", async (_req, res): Promise<void> => {
+  await db.delete(studySessionsTable).where(eq(studySessionsTable.key, SRS_SESSION_KEY));
+  res.sendStatus(204);
 });
 
 export default router;
