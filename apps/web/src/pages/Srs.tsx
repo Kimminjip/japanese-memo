@@ -14,7 +14,7 @@ export default function Srs() {
   const [includeWord, setIncludeWord] = useState(true);
   const [includeKanji, setIncludeKanji] = useState(true);
   const [levels, setLevels] = useState<Record<string, boolean>>({ N5: true, N4: true, N3: true, N2: true, N1: true });
-  const [newLimit, setNewLimit] = useState(() => Number(localStorage.getItem(NEW_LIMIT_KEY)) || 10);
+  const [newLimit, setNewLimit] = useState(() => Number(localStorage.getItem(NEW_LIMIT_KEY)) || 100);
   const [started, setStarted] = useState(false);
 
   const params = useMemo(() => {
