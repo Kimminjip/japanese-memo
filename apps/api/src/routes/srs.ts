@@ -20,8 +20,16 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// 카드 → SRS 학습용 front/back 변환 (엔진은 몰라도 되지만 응답엔 필요)
+// TTS용 괄호 제거 (공부하기와 동일)
+function stripParens(s: string): string {
+  return s.replace(/（[^）]*）/g, "").replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+}
+const firstLine = (s: string | null | undefined) => (s ?? "").split("\n")[0].trim();
+
+// 카드 → SRS 학습용 front/back + TTS 변환 (앞면 읽기와 동일한 읽기 순서)
 function wordCard(w: any) {
+  const reading = (w.furigana ?? "").trim() || w.japanese;
+  const koreanFirst = firstLine(w.korean);
   return {
     cardType: "word" as const,
     cardId: w.id,
@@ -30,10 +38,18 @@ function wordCard(w: any) {
     furigana: w.furigana ?? null,
     back: w.korean,
     jlptLevel: w.jlptLevel ?? null,
+    // 단어: 일본어(후리가나 우선) → 한국어 첫 뜻
+    tts: [
+      { text: stripParens(reading), lang: "ja" as const },
+      { text: stripParens(koreanFirst), lang: "ko" as const },
+    ].filter(t => t.text),
   };
 }
 function kanjiCard(k: any) {
   const back = [k.onyomi, k.kunyomi, k.korean].map((s: string) => (s ?? "").trim()).filter(Boolean).join(" / ");
+  const kun = firstLine(k.kunyomi);
+  const on = firstLine(k.onyomi);
+  const reading = [kun, on].filter(Boolean).join("、");
   return {
     cardType: "kanji" as const,
     cardId: k.id,
@@ -42,6 +58,8 @@ function kanjiCard(k: any) {
     furigana: null as string | null,
     back,
     jlptLevel: k.jlptLevel ?? null,
+    // 한자: 훈독、음독 (일본어)
+    tts: [{ text: stripParens(reading), lang: "ja" as const }].filter(t => t.text),
   };
 }
 

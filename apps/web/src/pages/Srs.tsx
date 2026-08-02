@@ -1,14 +1,15 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useGetSrsQueue, useGradeSrs, type SrsQueueCard, type SrsRating } from "@workspace/api-client-react";
+import { useGetSrsQueue, useGradeSrs, useSpeakJapanese, type SrsQueueCard, type SrsRating } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RefreshCw, RotateCcw, Shuffle } from "lucide-react";
+import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX } from "lucide-react";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const NEW_LIMIT_KEY = "srs_new_limit";
+const TTS_KEY = "srs-tts";
 
 export default function Srs() {
   const [includeWord, setIncludeWord] = useState(true);
@@ -16,6 +17,8 @@ export default function Srs() {
   const [levels, setLevels] = useState<Record<string, boolean>>({ N5: true, N4: true, N3: true, N2: true, N1: true });
   const [newLimit, setNewLimit] = useState(() => Number(localStorage.getItem(NEW_LIMIT_KEY)) || 100);
   const [started, setStarted] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem(TTS_KEY) !== "off");
+  const speakJapanese = useSpeakJapanese();
 
   const params = useMemo(() => {
     const types = [includeWord && "word", includeKanji && "kanji"].filter(Boolean).join(",");
@@ -84,6 +87,47 @@ export default function Srs() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [started, card, revealed, handleGrade]);
+
+  // 정답 공개 시 TTS 재생 (앞면 읽기와 동일한 순서)
+  useEffect(() => {
+    if (!ttsEnabled || !revealed || !card?.tts?.length) return;
+    let cancelled = false;
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+    (async () => {
+      for (const s of card.tts) {
+        if (cancelled) return;
+        if (!s.text) continue;
+        await speakJapanese(s.text, s.lang);
+        if (cancelled) return;
+        await sleep(250);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed, idx, ttsEnabled]);
+
+  // 세션 복습 덱: 뒤집어 정답 볼 때 TTS
+  useEffect(() => {
+    const rc = reviewDeck?.[reviewIdx];
+    if (!ttsEnabled || !reviewFlipped || !rc?.tts?.length) return;
+    let cancelled = false;
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+    (async () => {
+      for (const s of rc.tts) {
+        if (cancelled) return;
+        if (!s.text) continue;
+        await speakJapanese(s.text, s.lang);
+        if (cancelled) return;
+        await sleep(250);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewFlipped, reviewIdx, ttsEnabled]);
+
+  const toggleTts = useCallback(() => {
+    setTtsEnabled(v => { const n = !v; localStorage.setItem(TTS_KEY, n ? "on" : "off"); return n; });
+  }, []);
 
   const toggleLevel = (l: string) => setLevels(p => ({ ...p, [l]: !p[l] }));
 
@@ -157,7 +201,12 @@ export default function Srs() {
       <div className="max-w-2xl mx-auto space-y-6 select-none">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">세션 복습 <b className="text-foreground">{reviewIdx + 1}</b> / {reviewDeck.length}</span>
-          <button onClick={() => setReviewDeck(null)} className="text-muted-foreground hover:text-foreground">그만두기</button>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
+              {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+            <button onClick={() => setReviewDeck(null)} className="text-muted-foreground hover:text-foreground">그만두기</button>
+          </div>
         </div>
         <div
           className="bg-card rounded-xl border shadow-sm min-h-[16rem] sm:min-h-[20rem] flex flex-col items-center justify-center p-8 text-center cursor-pointer relative"
@@ -231,7 +280,12 @@ export default function Srs() {
         <span className="text-muted-foreground">
           남은 복습 <b className="text-foreground">{remainingReview}</b>장 · 신규 <b className="text-foreground">{remainingNew}</b>장
         </span>
-        <button onClick={() => setStarted(false)} className="text-muted-foreground hover:text-foreground">설정</button>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
+            {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
+          <button onClick={() => setStarted(false)} className="text-muted-foreground hover:text-foreground">설정</button>
+        </div>
       </div>
 
       <div

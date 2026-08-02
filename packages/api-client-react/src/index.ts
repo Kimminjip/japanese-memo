@@ -323,6 +323,7 @@ export interface SrsQueueCard {
   furigana: string | null;
   back: string;
   jlptLevel: string | null;
+  tts: { text: string; lang: "ja" | "ko" }[];
   isNew: boolean;
   state: { interval: number; ease: number; reps: number; lapses: number };
 }
