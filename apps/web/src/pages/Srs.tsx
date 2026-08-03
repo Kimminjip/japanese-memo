@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX } from "lucide-react";
+import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX, Play, Pause } from "lucide-react";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const NEW_LIMIT_KEY = "srs_new_limit";
@@ -46,6 +46,8 @@ export default function Srs() {
   const [reviewDeck, setReviewDeck] = useState<SrsQueueCard[] | null>(null);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [reviewFlipped, setReviewFlipped] = useState(false);
+  const [reviewAutoplay, setReviewAutoplay] = useState(false);
+  const reviewAutoToken = useRef(0);
 
   const persist = useCallback((cards: SrsQueueCard[], i: number) => {
     if (i >= cards.length) { clearSession.mutate(); return; }
@@ -107,6 +109,7 @@ export default function Srs() {
     setReviewDeck(deck);
     setReviewIdx(0);
     setReviewFlipped(false);
+    setReviewAutoplay(false);
   }, [sessionCards]);
 
   // 키보드: space=공개, 1/2/3=모름/애매/알아
@@ -143,10 +146,10 @@ export default function Srs() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed, idx, ttsEnabled]);
 
-  // 세션 복습 덱: 뒤집어 정답 볼 때 TTS
+  // 세션 복습 덱: 뒤집어 정답 볼 때 TTS (자동재생 중에는 그쪽에서 처리)
   useEffect(() => {
     const rc = reviewDeck?.[reviewIdx];
-    if (!ttsEnabled || !reviewFlipped || !rc?.tts?.length) return;
+    if (reviewAutoplay || !ttsEnabled || !reviewFlipped || !rc?.tts?.length) return;
     let cancelled = false;
     const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
     (async () => {
@@ -160,7 +163,45 @@ export default function Srs() {
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewFlipped, reviewIdx, ttsEnabled]);
+  }, [reviewFlipped, reviewIdx, ttsEnabled, reviewAutoplay]);
+
+  // 세션 복습 자동재생 — 공부하기 자동재생과 동일 구조로 읽고 자동으로 다음 카드
+  useEffect(() => {
+    if (!reviewAutoplay || !reviewDeck) return;
+    const rc = reviewDeck[reviewIdx];
+    if (!rc) return;
+    const token = ++reviewAutoToken.current;
+    const active = () => reviewAutoToken.current === token;
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+    // 공부하기 자동재생 구조: 단어=일본어→한국어→일본어, 한자=읽기 2회
+    const t = rc.tts ?? [];
+    const steps = rc.type === "word"
+      ? (t.length >= 2 ? [t[0], t[1], t[0]] : t)
+      : (t[0] ? [t[0], t[0]] : []);
+
+    setReviewFlipped(true);
+    (async () => {
+      if (ttsEnabled) {
+        for (const s of steps) {
+          if (!active()) return;
+          if (!s?.text) continue;
+          await speakJapanese(s.text, s.lang);
+          if (!active()) return;
+          await sleep(rc.type === "kanji" ? 1000 : 400);
+        }
+      } else {
+        await sleep(1800);
+      }
+      if (!active()) return;
+      await sleep(700);
+      if (!active()) return;
+      const nextIdx = reviewIdx + 1 >= reviewDeck.length ? 0 : reviewIdx + 1;
+      setReviewFlipped(false);
+      setReviewIdx(nextIdx);
+    })();
+    return () => { reviewAutoToken.current++; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewAutoplay, reviewIdx, reviewDeck, ttsEnabled]);
 
   const toggleTts = useCallback(() => {
     setTtsEnabled(v => { const n = !v; localStorage.setItem(TTS_KEY, n ? "on" : "off"); return n; });
@@ -244,10 +285,13 @@ export default function Srs() {
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">세션 복습 <b className="text-foreground">{reviewIdx + 1}</b> / {reviewDeck.length}</span>
           <div className="flex items-center gap-3">
+            <button onClick={() => setReviewAutoplay(v => !v)} title={reviewAutoplay ? "자동재생 정지" : "자동재생 시작"} className={reviewAutoplay ? "text-primary" : "text-muted-foreground/40"}>
+              {reviewAutoplay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </button>
             <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
               {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
-            <button onClick={() => setReviewDeck(null)} className="text-muted-foreground hover:text-foreground">그만두기</button>
+            <button onClick={() => { setReviewAutoplay(false); setReviewDeck(null); }} className="text-muted-foreground hover:text-foreground">그만두기</button>
           </div>
         </div>
         <div
