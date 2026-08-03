@@ -451,15 +451,33 @@ export function useRecordActivity() {
 
 // ─── TTS ───────────────────────────────────────────────────────────────────────
 
-export function useSpeakJapanese() {
-  const ctxRef = { current: null as AudioContext | null };
+// iOS(Safari/WebKit 기반 Chrome 포함)는 오디오 재생을 사용자 제스처와 같은 동기 흐름
+// 안에서 시작해야만 허용한다. AudioContext를 매번 새로 만들거나 fetch 이후에 만들면
+// 제스처 컨텍스트가 끊겨 재생이 막힌다. 그래서 전역 싱글턴 컨텍스트를 두고,
+// 함수 호출 시(=클릭 이벤트 콜스택 안, await 이전) 곧바로 생성/resume해서 "잠금 해제"한다.
+let sharedAudioCtx: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
+function unlockAudioCtx(): AudioContext {
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+    sharedAudioCtx = new AudioContext();
+  }
+  if (sharedAudioCtx.state === "suspended") {
+    // 반환된 Promise를 기다리지 않아도, 호출 자체가 제스처 콜스택 안에서 동기적으로
+    // 일어난다는 사실만으로 iOS의 잠금이 풀린다.
+    void sharedAudioCtx.resume();
+  }
+  return sharedAudioCtx;
+}
+
+export function useSpeakJapanese() {
   // lang: "ja" (기본) 또는 "ko". 재생이 끝나면 resolve되어 순차 재생에 사용 가능.
   return async (text: string, lang: "ja" | "ko" = "ja"): Promise<void> => {
+    const ctx = unlockAudioCtx(); // await 이전, 클릭 콜스택 안에서 동기 실행 (iOS 필수)
+    if (currentSource) { try { currentSource.stop(); } catch { /* 이미 끝났으면 무시 */ } }
+
     const res = await api.post<{ audioContent: string }>("/tts", { text, lang });
-    if (ctxRef.current) ctxRef.current.close();
-    const ctx = new AudioContext();
-    ctxRef.current = ctx;
+    if (ctx.state === "suspended") await ctx.resume();
     const binary = atob(res.data.audioContent);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -467,6 +485,7 @@ export function useSpeakJapanese() {
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(ctx.destination);
+    currentSource = source;
     return new Promise<void>((resolve) => {
       source.onended = () => resolve();
       source.start(0);
