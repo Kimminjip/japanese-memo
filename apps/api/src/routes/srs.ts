@@ -28,6 +28,10 @@ function shuffle<T>(arr: T[]): T[] {
 function stripParens(s: string): string {
   return s.replace(/（[^）]*）/g, "").replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 }
+// 한국어 TTS: 괄호 제거 + 물결표(〜/～/~)는 "무엇"으로 읽기
+function ttsKo(s: string): string {
+  return stripParens(s).replace(/[〜～~]/g, "무엇");
+}
 const firstLine = (s: string | null | undefined) => (s ?? "").split("\n")[0].trim();
 
 // 카드 → SRS 학습용 front/back + TTS 변환 (앞면 읽기와 동일한 읽기 순서)
@@ -45,7 +49,7 @@ function wordCard(w: any) {
     // 단어: 일본어(후리가나 우선) → 한국어 첫 뜻
     tts: [
       { text: stripParens(reading), lang: "ja" as const },
-      { text: stripParens(koreanFirst), lang: "ko" as const },
+      { text: ttsKo(koreanFirst), lang: "ko" as const },
     ].filter(t => t.text),
   };
 }

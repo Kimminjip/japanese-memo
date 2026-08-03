@@ -81,8 +81,6 @@ export default function Srs() {
   }, [started, resumed, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const card = queue[idx];
-  const remainingReview = queue.slice(idx).filter(c => !c.isNew).length;
-  const remainingNew = queue.slice(idx).filter(c => c.isNew).length;
 
   const handleGrade = useCallback((rating: SrsRating) => {
     if (!card) return;
@@ -322,7 +320,7 @@ export default function Srs() {
     <div className="max-w-2xl mx-auto space-y-6 select-none">
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
-          남은 복습 <b className="text-foreground">{remainingReview}</b>장 · 신규 <b className="text-foreground">{remainingNew}</b>장
+          <b className="text-foreground text-base">{idx}</b> / {queue.length}
         </span>
         <div className="flex items-center gap-3">
           <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
