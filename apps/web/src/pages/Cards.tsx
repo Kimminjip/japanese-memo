@@ -167,12 +167,16 @@ function CardListItem({
           onSpeak={item.example ? () => speakJapanese(item.example) : undefined}
         />
       )}
-      <div className="absolute top-2 right-12 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+      <div className="absolute top-2 right-12 flex gap-1 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity z-30">
         <Button
           variant="secondary"
           size="icon"
           className="shadow-sm"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          // 부모의 롱프레스(취약 등록)가 이 버튼 위에서는 시작되지 않도록 차단
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -184,7 +188,8 @@ function CardListItem({
           "absolute bottom-2 right-2 z-20 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
           item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString()
             ? "bg-primary/10 text-primary opacity-100"
-            : "bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
+            // 모바일(hover 없음)에서는 항상 보이게, 데스크톱에서는 hover 시 나타나게
+            : "bg-muted/80 text-muted-foreground opacity-70 sm:opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
         )}
         onClick={(e) => {
           e.preventDefault();
@@ -192,6 +197,9 @@ function CardListItem({
           (e.currentTarget as HTMLButtonElement).blur();
           handleMarkStudied();
         }}
+        // 부모의 롱프레스(취약 등록) 타이머가 이 버튼 위에서는 아예 시작되지 않도록 차단
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
         onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleMarkStudied(); }}
         title="오늘 학습으로 기록"
       >
@@ -229,7 +237,16 @@ export default function Cards() {
     if (grammar && (filter === "all" || filter === "grammar")) {
       list.push(...grammar.map(g => ({ ...g, cardType: "grammar" as const })));
     }
-    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // 낮은 급수(N5) 먼저 → 같은 급수 안에서는 먼저 등록된 카드 먼저
+    const levelRank = (lv: string | null | undefined) => {
+      const m: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
+      return (lv && m[lv]) ?? 9; // 미분류는 맨 뒤
+    };
+    list.sort((a, b) => {
+      const r = levelRank(a.jlptLevel) - levelRank(b.jlptLevel);
+      if (r !== 0) return r;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
     let result = list;
     if (jlptFilter !== "all") {
       result = result.filter(item => jlptFilter === "none" ? !item.jlptLevel : item.jlptLevel === jlptFilter);
