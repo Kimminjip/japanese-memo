@@ -11,12 +11,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Flashcard } from "@/components/Flashcard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Trash2, Pencil, Plus, X, BookOpen } from "lucide-react";
+import { Search, Trash2, Pencil, Plus, X, BookOpen, Keyboard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { EditDialog, EditTarget } from "@/components/EditDialog";
+import { VirtualKeyboard } from "@/components/VirtualKeyboard";
 
 const WEAK_THRESHOLD = 3;
 
@@ -221,6 +222,7 @@ export default function Cards() {
   // 빈 배열 = 전체(급수 제한 없음). 여러 급수 중복 선택 가능
   const [jlptFilters, setJlptFilters] = useState<JlptFilter[]>([]);
   const [search, setSearch] = useState("");
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
 
   const { data: words, isLoading: wordsLoading } = useListWords();
@@ -328,10 +330,25 @@ export default function Cards() {
           placeholder="검색어를 입력하세요..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
+          className="pl-10 pr-10"
           lang="ja"
           inputMode="text"
         />
+        {/* 필요할 때만 일본어 가상 키보드 활성화 (기본은 기기 키보드로 입력) */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8",
+            showKeyboard ? "text-primary" : "text-muted-foreground"
+          )}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setShowKeyboard(v => !v)}
+          title={showKeyboard ? "일본어 키보드 닫기" : "일본어 키보드 열기"}
+        >
+          <Keyboard className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -400,6 +417,14 @@ export default function Cards() {
             handleDelete(editTarget.id, editTarget.cardType);
             setEditTarget(null);
           }}
+        />
+      )}
+
+      {showKeyboard && (
+        <VirtualKeyboard
+          onInput={(char) => setSearch(prev => prev + char)}
+          onBackspace={() => setSearch(prev => prev.slice(0, -1))}
+          onClose={() => setShowKeyboard(false)}
         />
       )}
     </div>
