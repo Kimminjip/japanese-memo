@@ -21,7 +21,8 @@ import { EditDialog, EditTarget } from "@/components/EditDialog";
 const WEAK_THRESHOLD = 3;
 
 type FilterType = "all" | "words" | "kanji" | "grammar";
-type JlptFilter = "all" | "N5" | "N4" | "N3" | "N2" | "N1" | "none";
+type JlptFilter = "N5" | "N4" | "N3" | "N2" | "N1" | "none";
+const JLPT_FILTERS: JlptFilter[] = ["N5", "N4", "N3", "N2", "N1", "none"];
 
 function CardListItem({
   item,
@@ -74,19 +75,24 @@ function CardListItem({
     }
   }, [item, updateWord, updateKanji, updateGrammar, queryClient, toast]);
 
+  const studiedToday =
+    !!item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString();
+
+  // 이미 오늘 학습으로 기록돼 있으면 다시 눌러서 취소
   const handleMarkStudied = useCallback(() => {
+    const studied = !studiedToday;
     const done = (key: readonly unknown[]) => {
       queryClient.invalidateQueries({ queryKey: key });
-      toast({ title: "✓ 오늘 학습으로 기록했습니다." });
+      toast({ title: studied ? "✓ 오늘 학습으로 기록했습니다." : "오늘 학습 기록을 취소했습니다." });
     };
     if (item.cardType === "word") {
-      markWordStudied.mutate({ id: item.id }, { onSuccess: () => done(getListWordsQueryKey()) });
+      markWordStudied.mutate({ id: item.id, studied }, { onSuccess: () => done(getListWordsQueryKey()) });
     } else if (item.cardType === "kanji") {
-      markKanjiStudied.mutate({ id: item.id }, { onSuccess: () => done(getListKanjiQueryKey()) });
+      markKanjiStudied.mutate({ id: item.id, studied }, { onSuccess: () => done(getListKanjiQueryKey()) });
     } else {
-      markGrammarStudied.mutate({ id: item.id }, { onSuccess: () => done(getListGrammarQueryKey()) });
+      markGrammarStudied.mutate({ id: item.id, studied }, { onSuccess: () => done(getListGrammarQueryKey()) });
     }
-  }, [item, markWordStudied, markKanjiStudied, markGrammarStudied, queryClient, toast]);
+  }, [item, studiedToday, markWordStudied, markKanjiStudied, markGrammarStudied, queryClient, toast]);
 
   const startPress = () => {
     didLongPress.current = false;
@@ -186,7 +192,7 @@ function CardListItem({
         type="button"
         className={cn(
           "absolute bottom-2 right-2 z-20 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
-          item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString()
+          studiedToday
             ? "bg-primary/10 text-primary opacity-100"
             // 모바일(hover 없음)에서는 항상 보이게, 데스크톱에서는 hover 시 나타나게
             : "bg-muted/80 text-muted-foreground opacity-70 sm:opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
@@ -201,10 +207,10 @@ function CardListItem({
         onTouchStart={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
         onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleMarkStudied(); }}
-        title="오늘 학습으로 기록"
+        title={studiedToday ? "오늘 학습 기록 취소" : "오늘 학습으로 기록"}
       >
         <BookOpen className="h-3 w-3" />
-        {item.studiedAt && new Date(item.studiedAt).toDateString() === new Date().toDateString() ? "오늘 학습" : "학습 기록"}
+        {studiedToday ? "오늘 학습" : "학습 기록"}
       </button>
     </div>
   );
@@ -212,7 +218,8 @@ function CardListItem({
 
 export default function Cards() {
   const [filter, setFilter] = useState<FilterType>("all");
-  const [jlptFilter, setJlptFilter] = useState<JlptFilter>("all");
+  // 빈 배열 = 전체(급수 제한 없음). 여러 급수 중복 선택 가능
+  const [jlptFilters, setJlptFilters] = useState<JlptFilter[]>([]);
   const [search, setSearch] = useState("");
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
 
@@ -248,8 +255,12 @@ export default function Cards() {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
     let result = list;
-    if (jlptFilter !== "all") {
-      result = result.filter(item => jlptFilter === "none" ? !item.jlptLevel : item.jlptLevel === jlptFilter);
+    if (jlptFilters.length > 0) {
+      result = result.filter(item =>
+        item.jlptLevel
+          ? jlptFilters.includes(item.jlptLevel as JlptFilter)
+          : jlptFilters.includes("none")
+      );
     }
     if (search) {
       const q = search.toLowerCase();
@@ -264,7 +275,7 @@ export default function Cards() {
       });
     }
     return result;
-  }, [words, kanji, grammar, filter, jlptFilter, search]);
+  }, [words, kanji, grammar, filter, jlptFilters, search]);
 
   const handleDelete = (id: number, type: "word" | "kanji" | "grammar") => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
@@ -324,20 +335,38 @@ export default function Cards() {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {(["all", "N5", "N4", "N3", "N2", "N1", "none"] as JlptFilter[]).map(lv => (
-          <button
-            key={lv}
-            onClick={() => setJlptFilter(lv)}
-            className={cn(
-              "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-              jlptFilter === lv
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-border hover:bg-muted"
-            )}
-          >
-            {lv === "all" ? "전체" : lv === "none" ? "미분류" : lv}
-          </button>
-        ))}
+        <button
+          onClick={() => setJlptFilters([])}
+          className={cn(
+            "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+            jlptFilters.length === 0
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground border-border hover:bg-muted"
+          )}
+        >
+          전체
+        </button>
+        {JLPT_FILTERS.map(lv => {
+          const active = jlptFilters.includes(lv);
+          return (
+            <button
+              key={lv}
+              onClick={() =>
+                setJlptFilters(prev =>
+                  prev.includes(lv) ? prev.filter(v => v !== lv) : [...prev, lv]
+                )
+              }
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              {lv === "none" ? "미분류" : lv}
+            </button>
+          );
+        })}
       </div>
 
       {isLoading ? (

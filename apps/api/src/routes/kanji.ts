@@ -185,9 +185,12 @@ router.post("/kanji/:id/studied", async (req, res): Promise<void> => {
     return;
   }
 
+  // { studied: false } 를 보내면 오늘 학습 기록을 취소(null)
+  const studied = req.body?.studied !== false;
+
   const [kanji] = await db
     .update(kanjiTable)
-    .set({ studiedAt: new Date() })
+    .set({ studiedAt: studied ? new Date() : null })
     .where(eq(kanjiTable.id, params.data.id))
     .returning();
 

@@ -123,7 +123,9 @@ router.post("/grammar/:id/easy", async (req, res): Promise<void> => {
 router.post("/grammar/:id/studied", async (req, res): Promise<void> => {
   const params = IdParam.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  const [row] = await db.update(grammarTable).set({ studiedAt: new Date() }).where(eq(grammarTable.id, params.data.id)).returning();
+  // { studied: false } 를 보내면 오늘 학습 기록을 취소(null)
+  const studied = req.body?.studied !== false;
+  const [row] = await db.update(grammarTable).set({ studiedAt: studied ? new Date() : null }).where(eq(grammarTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Grammar not found" }); return; }
   res.json(row);
 });

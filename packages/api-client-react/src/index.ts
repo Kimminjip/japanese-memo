@@ -170,9 +170,10 @@ export function useRecordWordEasy() {
 }
 
 export function useMarkWordStudied() {
-  return useMutation<Word, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const res = await api.post(`/words/${id}/studied`);
+  // studied: false → 오늘 학습 기록 취소
+  return useMutation<Word, Error, { id: number; studied?: boolean }>({
+    mutationFn: async ({ id, studied = true }) => {
+      const res = await api.post(`/words/${id}/studied`, { studied });
       return res.data;
     },
   });
@@ -239,9 +240,10 @@ export function useRecordKanjiEasy() {
 }
 
 export function useMarkKanjiStudied() {
-  return useMutation<Kanji, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const res = await api.post(`/kanji/${id}/studied`);
+  // studied: false → 오늘 학습 기록 취소
+  return useMutation<Kanji, Error, { id: number; studied?: boolean }>({
+    mutationFn: async ({ id, studied = true }) => {
+      const res = await api.post(`/kanji/${id}/studied`, { studied });
       return res.data;
     },
   });
@@ -300,8 +302,9 @@ export function useRecordGrammarEasy() {
 }
 
 export function useMarkGrammarStudied() {
-  return useMutation<Grammar, Error, { id: number }>({
-    mutationFn: async ({ id }) => (await api.post(`/grammar/${id}/studied`)).data,
+  // studied: false → 오늘 학습 기록 취소
+  return useMutation<Grammar, Error, { id: number; studied?: boolean }>({
+    mutationFn: async ({ id, studied = true }) => (await api.post(`/grammar/${id}/studied`, { studied })).data,
   });
 }
 

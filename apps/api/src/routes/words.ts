@@ -183,9 +183,12 @@ router.post("/words/:id/studied", async (req, res): Promise<void> => {
     return;
   }
 
+  // { studied: false } 를 보내면 오늘 학습 기록을 취소(null)
+  const studied = req.body?.studied !== false;
+
   const [word] = await db
     .update(wordsTable)
-    .set({ studiedAt: new Date() })
+    .set({ studiedAt: studied ? new Date() : null })
     .where(eq(wordsTable.id, params.data.id))
     .returning();
 
