@@ -8,6 +8,7 @@ interface FlashcardProps {
   type: "word" | "kanji" | "grammar";
   japanese: string;
   furigana?: string | null;
+  showFurigana?: boolean;
   korean?: string;
   onyomi?: string;
   kunyomi?: string;
@@ -72,6 +73,7 @@ export function Flashcard({
   type,
   japanese,
   furigana,
+  showFurigana = true,
   korean,
   onyomi,
   kunyomi,
@@ -207,8 +209,9 @@ export function Flashcard({
           )}
           <div className="flex flex-col items-center gap-1">
             {type === "word" && (
+              // 후리가나를 숨겨도 높이는 유지해 카드 레이아웃이 흔들리지 않게 함
               <span className="font-serif text-muted-foreground text-sm lg:text-base font-medium h-5 lg:h-6">
-                {furigana || " "}
+                {showFurigana ? (furigana || " ") : " "}
               </span>
             )}
             <span

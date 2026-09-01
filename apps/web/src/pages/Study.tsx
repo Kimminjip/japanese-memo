@@ -32,7 +32,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause } from "lucide-react";
+import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause, Eye, EyeOff } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -315,6 +315,7 @@ export default function Study() {
   const speakJapanese = useSpeakJapanese();
   const recordActivity = useRecordActivity();
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
+  const [showFurigana, setShowFurigana] = useState(() => localStorage.getItem("study-furigana") !== "off");
   const [autoplay, setAutoplay] = useState(false);
   const autoplayRunToken = useRef(0);
   const queryClient = useQueryClient();
@@ -994,6 +995,22 @@ export default function Study() {
           <Button
             variant="ghost"
             size="icon"
+            className={showFurigana ? "text-primary" : "text-muted-foreground/40"}
+            onClick={e => {
+              e.stopPropagation();
+              setShowFurigana(v => {
+                const next = !v;
+                localStorage.setItem("study-furigana", next ? "on" : "off");
+                return next;
+              });
+            }}
+            title={showFurigana ? "후리가나 숨기기" : "후리가나 보기"}
+          >
+            {showFurigana ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className={autoplay ? "text-primary" : "text-muted-foreground/40"}
             onClick={e => { e.stopPropagation(); handleToggleAutoplay(); }}
             title={autoplay ? "자동재생 정지" : "자동재생 시작"}
@@ -1015,6 +1032,7 @@ export default function Study() {
                 type={underlayCard.type}
                 japanese={underlayCard.japanese}
                 furigana={underlayCard.furigana}
+                showFurigana={showFurigana}
                 korean={underlayCard.korean}
                 onyomi={underlayCard.onyomi}
                 kunyomi={underlayCard.kunyomi}
@@ -1038,6 +1056,7 @@ export default function Study() {
               type={card.type}
               japanese={card.japanese}
               furigana={card.furigana}
+              showFurigana={showFurigana}
               korean={card.korean}
               onyomi={card.onyomi}
               kunyomi={card.kunyomi}
