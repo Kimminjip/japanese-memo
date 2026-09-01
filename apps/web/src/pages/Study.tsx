@@ -32,7 +32,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause, Eye, EyeOff } from "lucide-react";
+import { Settings, Shuffle, ArrowLeft, AlertCircle, Volume2, VolumeX, Play, Pause, Eye, EyeOff, LayoutGrid, Square } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -316,6 +316,8 @@ export default function Study() {
   const recordActivity = useRecordActivity();
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem("study-tts") !== "off");
   const [showFurigana, setShowFurigana] = useState(() => localStorage.getItem("study-furigana") !== "off");
+  // 전체보기(그리드) 모드 — 기본은 한 장씩 넘기기
+  const [gridView, setGridView] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
   const autoplayRunToken = useRef(0);
   const queryClient = useQueryClient();
@@ -612,7 +614,7 @@ export default function Study() {
 
   // 카드 앞면 표시 시 TTS 재생 (전체 자동재생 모드일 때는 그쪽에서 처리)
   useEffect(() => {
-    if (!ttsEnabled || autoplay || deck.length === 0) return;
+    if (!ttsEnabled || autoplay || gridView || deck.length === 0) return;
     const card = deck[currentIdx];
     if (!card) return;
     const TILDE = /[〜～~]/g;
@@ -647,7 +649,7 @@ export default function Study() {
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIdx, deck.length, ttsEnabled, autoplay]);
+  }, [currentIdx, deck.length, ttsEnabled, autoplay, gridView]);
 
   const recordScore = useCallback((direction: "easy" | "hard") => {
     const card = deck[currentIdx];
@@ -715,7 +717,7 @@ export default function Study() {
 
   // 전체 자동재생 — 카드마다 앞면 내용을 2회(1초 간격) 읽고 다음 카드로 자동 이동
   useEffect(() => {
-    if (!autoplay || deck.length === 0) return;
+    if (!autoplay || gridView || deck.length === 0) return;
     const card = deck[currentIdx];
     if (!card) return;
 
@@ -775,7 +777,7 @@ export default function Study() {
 
     return () => { autoplayRunToken.current++; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoplay, currentIdx, deck.length]);
+  }, [autoplay, currentIdx, deck.length, gridView]);
 
   const handleToggleAutoplay = useCallback(() => {
     setAutoplay(v => !v);
@@ -834,6 +836,7 @@ export default function Study() {
   }, [flipCard]);
 
   useEffect(() => {
+    if (gridView) return; // 전체보기에서는 넘김 단축키 비활성화
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") { e.preventDefault(); goNextHardWithAnim(); }
       else if (e.key === "ArrowDown") { e.preventDefault(); flipCard(); }
@@ -842,10 +845,11 @@ export default function Study() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flipCard, goNextEasyWithAnim, goPrevWithAnim]);
+  }, [flipCard, goNextEasyWithAnim, goPrevWithAnim, gridView]);
 
   const wheelCooldown = useRef(false);
   useEffect(() => {
+    if (gridView) return; // 전체보기에서는 휠로 스크롤해야 하므로 넘김 동작을 끈다
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (wheelCooldown.current) return;
@@ -871,10 +875,11 @@ export default function Study() {
       window.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("auxclick", onAuxClick);
     };
-  }, [goNextWithAnim, goPrevWithAnim, goNextHardWithAnim]);
+  }, [goNextWithAnim, goPrevWithAnim, goNextHardWithAnim, gridView]);
 
   // 수직 스와이프 시 페이지 스크롤 방지 (document에 passive:false로 등록)
   useEffect(() => {
+    if (gridView) return; // 전체보기에서는 세로 스크롤이 필요하므로 막지 않는다
     const onTouchMove = (e: TouchEvent) => {
       if (touchStartX.current === null || touchStartY.current === null) return;
       const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
@@ -883,7 +888,7 @@ export default function Study() {
     };
     document.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => document.removeEventListener("touchmove", onTouchMove);
-  }, []);
+  }, [gridView]);
 
   if (deck.length === 0) {
     return (
@@ -930,11 +935,12 @@ export default function Study() {
 
   return (
     <div
-      className="flex flex-col gap-6 select-none cursor-pointer"
-      onClick={handleContainerClick}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      className={cn("flex flex-col gap-6 select-none", !gridView && "cursor-pointer")}
+      // 전체보기에서는 카드별로 눌러 뒤집으므로 컨테이너 제스처를 끈다
+      onClick={gridView ? undefined : handleContainerClick}
+      onTouchStart={gridView ? undefined : handleTouchStart}
+      onTouchMove={gridView ? undefined : handleTouchMove}
+      onTouchEnd={gridView ? undefined : handleTouchEnd}
     >
       {/* Top bar */}
       <div className="flex justify-between items-center">
@@ -1017,10 +1023,28 @@ export default function Study() {
           >
             {autoplay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={gridView ? "text-primary" : "text-muted-foreground/40"}
+            onClick={e => { e.stopPropagation(); setGridView(v => !v); }}
+            title={gridView ? "한 장씩 보기" : "전체 보기"}
+          >
+            {gridView ? <Square className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+          </Button>
           <span className="text-sm text-muted-foreground font-medium">{studyStep} / {deck.length}장</span>
         </div>
       </div>
 
+      {gridView ? (
+        /* 전체보기: 덱 전체를 격자로. 카드마다 눌러서 개별로 뒤집기 */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {deck.map(c => (
+            <GridCard key={`${c.type}-${c.id}`} card={c} showFurigana={showFurigana} />
+          ))}
+        </div>
+      ) : (
+      <>
       {/* Card */}
       <div ref={cardContainerRef} className="mx-auto w-full lg:w-[60%]">
         <div className="relative">
@@ -1087,11 +1111,38 @@ export default function Study() {
           <span>탭 뒤집기 · 길게 취약</span>
         </div>
       </div>
+      </>
+      )}
 
       {editTarget && (
         <EditDialog target={editTarget} onClose={() => setEditTarget(null)} />
       )}
     </div>
+  );
+}
+
+// 전체보기 모드의 카드 한 장 — 각자 독립적으로 뒤집힌다
+function GridCard({ card, showFurigana }: { card: StudyCard; showFurigana: boolean }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <Flashcard
+      type={card.type}
+      japanese={card.japanese}
+      furigana={card.furigana}
+      showFurigana={showFurigana}
+      korean={card.korean}
+      onyomi={card.onyomi}
+      kunyomi={card.kunyomi}
+      formation={card.formation}
+      example={card.example}
+      exampleKorean={card.exampleKorean}
+      exampleHighlight={card.exampleHighlight}
+      wrongCount={card.wrongCount}
+      manualWeak={card.manualWeak}
+      jlptLevel={card.jlptLevel}
+      isFlipped={flipped}
+      onFlip={() => setFlipped(f => !f)}
+    />
   );
 }
 
