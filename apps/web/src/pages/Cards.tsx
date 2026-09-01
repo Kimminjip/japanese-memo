@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   useListWords, useListKanji, useListGrammar,
   useDeleteWord, useDeleteKanji, useDeleteGrammar,
@@ -222,8 +222,17 @@ export default function Cards() {
   // 빈 배열 = 전체(급수 제한 없음). 여러 급수 중복 선택 가능
   const [jlptFilters, setJlptFilters] = useState<JlptFilter[]>([]);
   const [search, setSearch] = useState("");
+  // 입력할 때마다 4천여 장을 재필터링/재렌더하면 버벅이므로 검색어는 디바운스 후 적용
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  // 한 번에 렌더하는 카드 수 (스크롤하면 더 불러옴)
+  const [visibleCount, setVisibleCount] = useState(60);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const { data: words, isLoading: wordsLoading } = useListWords();
   const { data: kanji, isLoading: kanjiLoading } = useListKanji();
@@ -235,7 +244,8 @@ export default function Cards() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const allCards = useMemo(() => {
+  // 정렬은 검색어와 무관하므로 따로 메모이즈 (검색할 때마다 4천여 장 재정렬 방지)
+  const sortedCards = useMemo(() => {
     const list: any[] = [];
     if (words && (filter === "all" || filter === "words")) {
       list.push(...words.map(w => ({ ...w, cardType: "word" as const })));
@@ -251,12 +261,18 @@ export default function Cards() {
       const m: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
       return (lv && m[lv]) ?? 9; // 미분류는 맨 뒤
     };
+    // createdAt 파싱을 정렬 비교마다 반복하지 않도록 미리 계산
+    for (const item of list) item._ts = new Date(item.createdAt).getTime();
     list.sort((a, b) => {
       const r = levelRank(a.jlptLevel) - levelRank(b.jlptLevel);
       if (r !== 0) return r;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return a._ts - b._ts;
     });
-    let result = list;
+    return list;
+  }, [words, kanji, grammar, filter]);
+
+  const allCards = useMemo(() => {
+    let result = sortedCards;
     if (jlptFilters.length > 0) {
       result = result.filter(item =>
         item.jlptLevel
@@ -264,8 +280,8 @@ export default function Cards() {
           : jlptFilters.includes("none")
       );
     }
-    if (search) {
-      const q = search.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter(item => {
         if (item.cardType === "word") {
           return item.japanese.includes(q) || item.korean.toLowerCase().includes(q) || (item.furigana && item.furigana.includes(q));
@@ -277,7 +293,12 @@ export default function Cards() {
       });
     }
     return result;
-  }, [words, kanji, grammar, filter, jlptFilters, search]);
+  }, [sortedCards, jlptFilters, debouncedSearch]);
+
+  // 필터/검색이 바뀌면 처음부터 다시 보여주기
+  useEffect(() => { setVisibleCount(60); }, [debouncedSearch, jlptFilters, filter]);
+
+  const visibleCards = useMemo(() => allCards.slice(0, visibleCount), [allCards, visibleCount]);
 
   const handleDelete = (id: number, type: "word" | "kanji" | "grammar") => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
@@ -397,16 +418,31 @@ export default function Cards() {
           <p className="text-lg text-muted-foreground">카드가 없습니다.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {allCards.map(item => (
-            <CardListItem
-              key={`${item.cardType}-${item.id}`}
-              item={item}
-              onEdit={() => handleEdit(item)}
-              onDelete={() => handleDelete(item.id, item.cardType)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="text-sm text-muted-foreground">
+            {allCards.length}장
+            {visibleCards.length < allCards.length && ` 중 ${visibleCards.length}장 표시`}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {visibleCards.map(item => (
+              <CardListItem
+                key={`${item.cardType}-${item.id}`}
+                item={item}
+                onEdit={() => handleEdit(item)}
+                onDelete={() => handleDelete(item.id, item.cardType)}
+              />
+            ))}
+          </div>
+          {visibleCards.length < allCards.length && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setVisibleCount(c => c + 60)}
+            >
+              더 보기 ({allCards.length - visibleCards.length}장 남음)
+            </Button>
+          )}
+        </>
       )}
 
       {editTarget && (

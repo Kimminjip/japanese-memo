@@ -5,11 +5,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX, Play, Pause } from "lucide-react";
+import { RefreshCw, RotateCcw, Shuffle, Volume2, VolumeX, Play, Pause, Eye, EyeOff } from "lucide-react";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
 const NEW_LIMIT_KEY = "srs_new_limit";
 const TTS_KEY = "srs-tts";
+const FURIGANA_KEY = "srs-furigana";
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
 export default function Srs() {
@@ -20,6 +21,7 @@ export default function Srs() {
   const [started, setStarted] = useState(false);
   const [resumed, setResumed] = useState(false); // 저장된 세션에서 이어받음
   const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem(TTS_KEY) !== "off");
+  const [showFurigana, setShowFurigana] = useState(() => localStorage.getItem(FURIGANA_KEY) !== "off");
   const speakJapanese = useSpeakJapanese();
 
   const params = useMemo(() => {
@@ -207,6 +209,10 @@ export default function Srs() {
     setTtsEnabled(v => { const n = !v; localStorage.setItem(TTS_KEY, n ? "on" : "off"); return n; });
   }, []);
 
+  const toggleFurigana = useCallback(() => {
+    setShowFurigana(v => { const n = !v; localStorage.setItem(FURIGANA_KEY, n ? "on" : "off"); return n; });
+  }, []);
+
   const toggleLevel = (l: string) => setLevels(p => ({ ...p, [l]: !p[l] }));
 
   // 저장된 세션 확인 중이면 잠깐 대기 (설정 화면 깜빡임 방지)
@@ -291,6 +297,9 @@ export default function Srs() {
             <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
               {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
+            <button onClick={toggleFurigana} title={showFurigana ? "후리가나 숨기기" : "후리가나 보기"} className={showFurigana ? "text-primary" : "text-muted-foreground/40"}>
+              {showFurigana ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            </button>
             <button onClick={() => { setReviewAutoplay(false); setReviewDeck(null); }} className="text-muted-foreground hover:text-foreground">그만두기</button>
           </div>
         </div>
@@ -299,7 +308,7 @@ export default function Srs() {
           onClick={() => setReviewFlipped(f => !f)}
         >
           {rc.jlptLevel && <span className="absolute top-3 left-3 text-xs text-muted-foreground/60">{rc.jlptLevel}</span>}
-          {rc.type === "word" && rc.furigana && (
+          {rc.type === "word" && rc.furigana && showFurigana && (
             <span className="font-serif text-muted-foreground text-base mb-1">{rc.furigana}</span>
           )}
           <span className={cn("font-serif font-medium text-foreground break-keep", rKanji ? "text-7xl sm:text-9xl" : "text-4xl sm:text-6xl")}>{rc.front}</span>
@@ -370,6 +379,9 @@ export default function Srs() {
           <button onClick={toggleTts} title={ttsEnabled ? "TTS 끄기" : "TTS 켜기"} className={ttsEnabled ? "text-primary" : "text-muted-foreground/40"}>
             {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </button>
+          <button onClick={toggleFurigana} title={showFurigana ? "후리가나 숨기기" : "후리가나 보기"} className={showFurigana ? "text-primary" : "text-muted-foreground/40"}>
+            {showFurigana ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </button>
           <button onClick={exitToSetup} className="text-muted-foreground hover:text-foreground">설정</button>
         </div>
       </div>
@@ -381,7 +393,7 @@ export default function Srs() {
         {card.jlptLevel && <span className="absolute top-3 left-3 text-xs text-muted-foreground/60">{card.jlptLevel}</span>}
         {card.isNew && <span className="absolute top-3 right-3 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">신규</span>}
 
-        {card.type === "word" && card.furigana && (
+        {card.type === "word" && card.furigana && showFurigana && (
           <span className="font-serif text-muted-foreground text-base mb-1">{card.furigana}</span>
         )}
         <span className={cn("font-serif font-medium text-foreground break-keep", isKanji ? "text-7xl sm:text-9xl" : "text-4xl sm:text-6xl")}>
