@@ -192,16 +192,11 @@ function loadDeck(
   }
 
   if (orderMode === "sequence") {
-    // 쉬운 순서: 급수 오름차순(N5→N1) → 같은 급수 안에서는 생성일 순
-    const rank = (lv: string | null | undefined) => {
-      const m: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
-      return (lv && m[lv]) ?? 9;
-    };
-    return [...items].sort((a, b) => {
-      const r = rank(a.jlptLevel) - rank(b.jlptLevel);
-      if (r !== 0) return r;
-      return new Date(a._createdAt ?? 0).getTime() - new Date(b._createdAt ?? 0).getTime();
-    });
+    // 등록 순서: 오래된 것부터. 단 '오늘 학습'을 누른 카드는 그 시점을 등록일보다
+    // 우선해서 사용하므로, 최근에 학습 표시한 카드일수록 뒤로 간다.
+    const orderTime = (i: { _createdAt?: string; _studiedAt?: string | null }) =>
+      new Date(i._studiedAt || i._createdAt || 0).getTime();
+    return [...items].sort((a, b) => orderTime(a) - orderTime(b));
   }
 
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
@@ -1225,7 +1220,7 @@ function SettingsPanel({
             </div>
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="sequence" id="s-order-sequence" />
-              <Label htmlFor="s-order-sequence" className="font-normal">쉬운 순서 (N5→N1)</Label>
+              <Label htmlFor="s-order-sequence" className="font-normal">등록 순서</Label>
             </div>
           </RadioGroup>
         </div>
