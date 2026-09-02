@@ -8,6 +8,7 @@ import ttsRouter from "./tts";
 import aiRouter from "./ai";
 import grammarRouter from "./grammar";
 import srsRouter from "./srs";
+import adminDistractorsRouter from "./admin-distractors";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(studySessionRouter);
 router.use(ttsRouter);
 router.use(aiRouter);
 router.use(srsRouter);
+router.use(adminDistractorsRouter);
 
 export default router;
