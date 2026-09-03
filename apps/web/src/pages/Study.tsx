@@ -192,11 +192,11 @@ function loadDeck(
   }
 
   if (orderMode === "sequence") {
-    // 등록 순서: 오래된 것부터. 단 '오늘 학습'을 누른 카드는 그 시점을 등록일보다
-    // 우선해서 사용하므로, 최근에 학습 표시한 카드일수록 뒤로 간다.
+    // 등록 순서: '오늘 학습' 시각을 실제 등록일보다 우선해서 사용하고,
+    // 최근에 학습했거나 등록한 카드부터 보여준다.
     const orderTime = (i: { _createdAt?: string; _studiedAt?: string | null }) =>
       new Date(i._studiedAt || i._createdAt || 0).getTime();
-    return [...items].sort((a, b) => orderTime(a) - orderTime(b));
+    return [...items].sort((a, b) => orderTime(b) - orderTime(a));
   }
 
   return weightedShuffle(items, item => difficultyWeight(item.wrongCount, item.manualWeak));
