@@ -261,12 +261,15 @@ export default function Cards() {
       const m: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
       return (lv && m[lv]) ?? 9; // 미분류는 맨 뒤
     };
-    // createdAt 파싱을 정렬 비교마다 반복하지 않도록 미리 계산
-    for (const item of list) item._ts = new Date(item.createdAt).getTime();
+    // 오늘 학습을 누른 시각이 있으면 그 시각을, 없으면 실제 등록 시각을 사용한다.
+    // 따라서 최근에 학습했거나 새로 등록한 카드가 항상 위에 표시된다.
+    for (const item of list) {
+      item._ts = new Date(item.studiedAt ?? item.createdAt).getTime();
+    }
     list.sort((a, b) => {
-      const r = levelRank(a.jlptLevel) - levelRank(b.jlptLevel);
-      if (r !== 0) return r;
-      return a._ts - b._ts;
+      const timeDifference = b._ts - a._ts;
+      if (timeDifference !== 0) return timeDifference;
+      return levelRank(a.jlptLevel) - levelRank(b.jlptLevel);
     });
     return list;
   }, [words, kanji, grammar, filter]);
