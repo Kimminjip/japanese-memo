@@ -5,6 +5,7 @@ import {
   useUpdateWord, useUpdateKanji, useUpdateGrammar,
   useMarkWordStudied, useMarkKanjiStudied, useMarkGrammarStudied,
   useSpeakJapanese,
+  stopSpeaking,
   getListWordsQueryKey, getListKanjiQueryKey, getListGrammarQueryKey, getGetStatsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +25,34 @@ const WEAK_THRESHOLD = 3;
 type FilterType = "all" | "words" | "kanji" | "grammar";
 type JlptFilter = "N5" | "N4" | "N3" | "N2" | "N1" | "none";
 const JLPT_FILTERS: JlptFilter[] = ["N5", "N4", "N3", "N2", "N1", "none"];
+
+type CardTtsStep = { text: string; lang: "ja" | "ko" };
+function cleanTtsText(text: string): string {
+  return text
+    .replace(/（[^）]*）/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCardFrontTtsSteps(item: any): CardTtsStep[] {
+  const tilde = /[〜～~]/g;
+  if (item.cardType === "word") {
+    return [
+      { text: (item.furigana ?? "").trim() || item.japanese, lang: "ja" },
+      { text: (item.korean ?? "").split("\n")[0]?.trim() ?? "", lang: "ko" },
+    ];
+  }
+  if (item.cardType === "grammar") {
+    return [
+      { text: (item.pattern ?? "").replace(tilde, "").trim(), lang: "ja" },
+      { text: (item.meaning ?? "").replace(tilde, "무엇").trim(), lang: "ko" },
+    ];
+  }
+  const kun = (item.kunyomi ?? "").split("\n")[0].trim();
+  const on = (item.onyomi ?? "").split("\n")[0].trim();
+  return [{ text: [kun, on].filter(Boolean).join("、"), lang: "ja" }];
+}
 
 function CardListItem({
   item,
@@ -47,17 +76,38 @@ function CardListItem({
   const didLongPress = useRef(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const autoFlipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechRun = useRef(0);
+
+  const speakFront = useCallback(async () => {
+    const run = ++speechRun.current;
+    stopSpeaking();
+    await Promise.resolve();
+    if (run !== speechRun.current) return;
+    for (const step of getCardFrontTtsSteps(item)) {
+      if (run !== speechRun.current) return;
+      const text = cleanTtsText(step.text);
+      if (!text) continue;
+      await speakJapanese(text, step.lang);
+      if (run !== speechRun.current) return;
+    }
+  }, [item, speakJapanese]);
 
   const handleFlip = useCallback(() => {
-    setIsFlipped(prev => {
-      const next = !prev;
-      if (autoFlipTimer.current) clearTimeout(autoFlipTimer.current);
-      if (next) {
-        autoFlipTimer.current = setTimeout(() => setIsFlipped(false), 5000);
-      }
-      return next;
-    });
-  }, []);
+    const next = !isFlipped;
+    setIsFlipped(next);
+    if (autoFlipTimer.current) clearTimeout(autoFlipTimer.current);
+    if (next) {
+      autoFlipTimer.current = setTimeout(() => {
+        setIsFlipped(false);
+        speechRun.current++;
+        stopSpeaking();
+      }, 5000);
+      void speakFront();
+    } else {
+      speechRun.current++;
+      stopSpeaking();
+    }
+  }, [isFlipped, speakFront]);
 
   const handleToggleWeak = useCallback(() => {
     const isWeak = item.manualWeak || item.wrongCount >= WEAK_THRESHOLD;
@@ -139,7 +189,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={() => speakJapanese((item.furigana ?? "").trim() || item.japanese)}
+          onSpeak={() => void speakFront()}
         />
       ) : item.cardType === "kanji" ? (
         <Flashcard
@@ -154,7 +204,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={() => speakJapanese(item.character)}
+          onSpeak={() => void speakFront()}
         />
       ) : (
         <Flashcard
@@ -171,7 +221,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
-          onSpeak={item.example ? () => speakJapanese(item.example) : undefined}
+          onSpeak={() => void speakFront()}
         />
       )}
       <div className="absolute top-2 right-12 flex gap-1 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity z-30">

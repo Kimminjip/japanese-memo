@@ -16,6 +16,7 @@ import {
   useSaveStudySession,
   useClearStudySession,
   useSpeakJapanese,
+  stopSpeaking,
   useRecordActivity,
   getListWordsQueryKey,
   getListKanjiQueryKey,
@@ -137,6 +138,27 @@ function stripParens(s: string): string {
     .replace(/\([^)]*\)/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+type FrontTtsStep = { text: string; lang: "ja" | "ko" };
+
+function getFrontTtsSteps(card: StudyCard): FrontTtsStep[] {
+  const tilde = /[〜～~]/g;
+  if (card.type === "word") {
+    return [
+      { text: (card.furigana ?? "").trim() || card.japanese, lang: "ja" },
+      { text: (card.korean ?? "").split("\n")[0]?.trim() ?? "", lang: "ko" },
+    ];
+  }
+  if (card.type === "grammar") {
+    return [
+      { text: (card.japanese ?? "").replace(tilde, "").trim(), lang: "ja" },
+      { text: (card.korean ?? "").replace(tilde, "무엇").trim(), lang: "ko" },
+    ];
+  }
+  const kun = (card.kunyomi ?? "").split("\n")[0].trim();
+  const on = (card.onyomi ?? "").split("\n")[0].trim();
+  return [{ text: [kun, on].filter(Boolean).join("、"), lang: "ja" }];
 }
 
 function difficultyWeight(wrongCount: number | undefined, manualWeak: boolean | undefined): number {
@@ -642,7 +664,7 @@ export default function Study() {
         await sleep(250);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; stopSpeaking(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, deck.length, ttsEnabled, autoplay, gridView]);
 
@@ -670,6 +692,7 @@ export default function Study() {
   const goNextWithAnim = useCallback(() => {
     if (animLock.current) return;
     animLock.current = true;
+    stopSpeaking();
     setAnimPhase("exit-left");
     setTimeout(() => {
       goNext();
@@ -681,6 +704,7 @@ export default function Study() {
   const goPrevWithAnim = useCallback(() => {
     if (animLock.current) return;
     animLock.current = true;
+    stopSpeaking();
     // 현재 카드를 언더레이로 고정, 이전 카드가 위에서 덮어옴
     setUnderlayCard(deck[currentIdx] ?? null);
     goPrev();
@@ -693,6 +717,7 @@ export default function Study() {
   }, [goPrev, deck, currentIdx]);
 
   const goNextEasyWithAnim = useCallback(() => {
+    stopSpeaking();
     recordScore("easy");
     goNextWithAnim(); // 좌로 퇴장
   }, [recordScore, goNextWithAnim]);
@@ -700,6 +725,7 @@ export default function Study() {
   const HARD_ANIM_MS = 380;
   const goNextHardWithAnim = useCallback(() => {
     if (animLock.current) return;
+    stopSpeaking();
     recordScore("hard");
     animLock.current = true;
     setAnimPhase("exit-up");              // 위로 포물선 퇴장
@@ -775,6 +801,7 @@ export default function Study() {
   }, [autoplay, currentIdx, deck.length, gridView]);
 
   const handleToggleAutoplay = useCallback(() => {
+    stopSpeaking();
     setAutoplay(v => !v);
   }, []);
 
@@ -985,6 +1012,7 @@ export default function Study() {
               e.stopPropagation();
               setTtsEnabled(v => {
                 const next = !v;
+                if (!next) stopSpeaking();
                 localStorage.setItem("study-tts", next ? "on" : "off");
                 return next;
               });
@@ -1022,7 +1050,7 @@ export default function Study() {
             variant="ghost"
             size="icon"
             className={gridView ? "text-primary" : "text-muted-foreground/40"}
-            onClick={e => { e.stopPropagation(); setGridView(v => !v); }}
+            onClick={e => { e.stopPropagation(); stopSpeaking(); setGridView(v => !v); }}
             title={gridView ? "한 장씩 보기" : "전체 보기"}
           >
             {gridView ? <Square className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
@@ -1035,7 +1063,7 @@ export default function Study() {
         /* 전체보기: 덱 전체를 격자로. 카드마다 눌러서 개별로 뒤집기 */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {deck.map(c => (
-            <GridCard key={`${c.type}-${c.id}`} card={c} showFurigana={showFurigana} />
+            <GridCard key={`${c.type}-${c.id}`} card={c} showFurigana={showFurigana} ttsEnabled={ttsEnabled} />
           ))}
         </div>
       ) : (
@@ -1117,8 +1145,34 @@ export default function Study() {
 }
 
 // 전체보기 모드의 카드 한 장 — 각자 독립적으로 뒤집힌다
-function GridCard({ card, showFurigana }: { card: StudyCard; showFurigana: boolean }) {
+function GridCard({ card, showFurigana, ttsEnabled }: { card: StudyCard; showFurigana: boolean; ttsEnabled: boolean }) {
   const [flipped, setFlipped] = useState(false);
+  const speakJapanese = useSpeakJapanese();
+  const speechRun = useRef(0);
+
+  const handleFlip = useCallback(() => {
+    const next = !flipped;
+    setFlipped(next);
+    if (!next) {
+      speechRun.current++;
+      stopSpeaking();
+      return;
+    }
+    if (!ttsEnabled) return;
+    const run = ++speechRun.current;
+    stopSpeaking();
+    void (async () => {
+      await Promise.resolve();
+      if (run !== speechRun.current) return;
+      for (const step of getFrontTtsSteps(card)) {
+        if (run !== speechRun.current) return;
+        const text = stripParens(step.text);
+        if (!text) continue;
+        await speakJapanese(text, step.lang);
+        if (run !== speechRun.current) return;
+      }
+    })();
+  }, [card, flipped, speakJapanese, ttsEnabled]);
   return (
     <Flashcard
       type={card.type}
@@ -1136,7 +1190,7 @@ function GridCard({ card, showFurigana }: { card: StudyCard; showFurigana: boole
       manualWeak={card.manualWeak}
       jlptLevel={card.jlptLevel}
       isFlipped={flipped}
-      onFlip={() => setFlipped(f => !f)}
+      onFlip={handleFlip}
     />
   );
 }

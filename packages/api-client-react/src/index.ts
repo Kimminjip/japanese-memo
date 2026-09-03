@@ -460,6 +460,26 @@ export function useRecordActivity() {
 // 함수 호출 시(=클릭 이벤트 콜스택 안, await 이전) 곧바로 생성/resume해서 "잠금 해제"한다.
 let sharedAudioCtx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
+let currentResolve: (() => void) | null = null;
+let speechGeneration = 0;
+
+function stopCurrentSource() {
+  const source = currentSource;
+  const resolve = currentResolve;
+  currentSource = null;
+  currentResolve = null;
+  if (source) {
+    source.onended = null;
+    try { source.stop(); } catch { /* already stopped */ }
+    try { source.disconnect(); } catch { /* already disconnected */ }
+  }
+  resolve?.();
+}
+
+export function stopSpeaking() {
+  speechGeneration++;
+  stopCurrentSource();
+}
 
 function unlockAudioCtx(): AudioContext {
   if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
@@ -477,20 +497,30 @@ export function useSpeakJapanese() {
   // lang: "ja" (기본) 또는 "ko". 재생이 끝나면 resolve되어 순차 재생에 사용 가능.
   return async (text: string, lang: "ja" | "ko" = "ja"): Promise<void> => {
     const ctx = unlockAudioCtx(); // await 이전, 클릭 콜스택 안에서 동기 실행 (iOS 필수)
-    if (currentSource) { try { currentSource.stop(); } catch { /* 이미 끝났으면 무시 */ } }
+    const generation = ++speechGeneration;
+    stopCurrentSource();
 
     const res = await api.post<{ audioContent: string }>("/tts", { text, lang });
+    if (generation !== speechGeneration) return;
     if (ctx.state === "suspended") await ctx.resume();
     const binary = atob(res.data.audioContent);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+    if (generation !== speechGeneration) return;
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(ctx.destination);
     currentSource = source;
     return new Promise<void>((resolve) => {
-      source.onended = () => resolve();
+      currentResolve = resolve;
+      source.onended = () => {
+        if (currentSource === source) {
+          currentSource = null;
+          currentResolve = null;
+        }
+        resolve();
+      };
       source.start(0);
     });
   };
