@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Cards from "@/pages/Cards";
 import Add from "@/pages/Add";
 import Quiz from "@/pages/Quiz";
+import KanaQuiz from "@/pages/KanaQuiz";
 import Study from "@/pages/Study";
 import Srs from "@/pages/Srs";
 import Stats from "@/pages/Stats";
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/cards" component={Cards} />
         <Route path="/add" component={Add} />
         <Route path="/quiz" component={Quiz} />
+        <Route path="/kana-quiz" component={KanaQuiz} />
         <Route path="/study" component={Study} />
         <Route path="/srs" component={Srs} />
         <Route path="/stats" component={Stats} />
