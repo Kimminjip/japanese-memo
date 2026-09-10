@@ -9,6 +9,7 @@ import aiRouter from "./ai";
 import grammarRouter from "./grammar";
 import srsRouter from "./srs";
 import adminDistractorsRouter from "./admin-distractors";
+import kanaQuizRouter from "./kana-quiz";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(ttsRouter);
 router.use(aiRouter);
 router.use(srsRouter);
 router.use(adminDistractorsRouter);
+router.use(kanaQuizRouter);
 
 export default router;
