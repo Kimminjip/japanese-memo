@@ -27,20 +27,22 @@ router.get("/kana-quiz/stats", async (_req, res): Promise<void> => {
 router.post("/kana-quiz/result", async (req, res): Promise<void> => {
   await ensureTable();
   const kana = String(req.body?.kana ?? "").trim();
-  const wrong = req.body?.wrong === true ? 1 : 0;
+  const wrongOnly = req.body?.wrongOnly === true;
+  const attempts = wrongOnly ? 0 : 1;
+  const wrong = wrongOnly || req.body?.wrong === true ? 1 : 0;
   if (!kana || kana.length > 4) {
     res.status(400).json({ message: "올바른 글자가 필요합니다." });
     return;
   }
   const result = await pool.query(
     `INSERT INTO kana_quiz_stats (kana, attempts, wrong_count)
-     VALUES ($1, 1, $2)
+     VALUES ($1, $2, $3)
      ON CONFLICT (kana) DO UPDATE SET
-       attempts = kana_quiz_stats.attempts + 1,
-       wrong_count = kana_quiz_stats.wrong_count + $2,
+       attempts = kana_quiz_stats.attempts + $2,
+       wrong_count = kana_quiz_stats.wrong_count + $3,
        updated_at = NOW()
      RETURNING kana, attempts, wrong_count AS wrong`,
-    [kana, wrong],
+    [kana, attempts, wrong],
   );
   res.json(result.rows[0]);
 });
