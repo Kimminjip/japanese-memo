@@ -189,6 +189,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
+          alwaysShowWeakToggle
           onSpeak={() => void speakFront()}
         />
       ) : item.cardType === "kanji" ? (
@@ -204,6 +205,7 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
+          alwaysShowWeakToggle
           onSpeak={() => void speakFront()}
         />
       ) : (
@@ -221,14 +223,15 @@ function CardListItem({
           isFlipped={isFlipped}
           onFlip={handleFlip}
           onToggleWeak={handleToggleWeak}
+          alwaysShowWeakToggle
           onSpeak={() => void speakFront()}
         />
       )}
       <div className="absolute top-2 right-12 flex gap-1 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity z-30">
         <Button
-          variant="secondary"
+          variant="outline"
           size="icon"
-          className="shadow-sm"
+          className="border-muted-foreground/15 bg-background/70 text-muted-foreground/50 shadow-sm hover:bg-muted/50 hover:text-muted-foreground"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
           // 부모의 롱프레스(취약 등록)가 이 버튼 위에서는 시작되지 않도록 차단
           onTouchStart={(e) => e.stopPropagation()}

@@ -23,6 +23,7 @@ interface FlashcardProps {
   isFlipped?: boolean;
   onFlip?: () => void;
   onToggleWeak?: () => void;
+  alwaysShowWeakToggle?: boolean;
   onEdit?: () => void;
   onSpeak?: () => void;
 }
@@ -87,6 +88,7 @@ export function Flashcard({
   isFlipped: isFlippedProp,
   onFlip,
   onToggleWeak,
+  alwaysShowWeakToggle = false,
   onEdit,
   onSpeak,
 }: FlashcardProps) {
@@ -146,7 +148,9 @@ export function Flashcard({
             "absolute top-2 right-2 z-20 p-1.5 rounded-full transition-all duration-200",
             isWeak
               ? "opacity-100"
-              : "opacity-0 hover:opacity-100"
+              : alwaysShowWeakToggle
+                ? "opacity-100 bg-background/70 shadow-sm"
+                : "opacity-0 hover:opacity-100"
           )}
           onClick={(e) => {
             e.stopPropagation();
@@ -162,7 +166,7 @@ export function Flashcard({
               "h-5 w-5 transition-colors",
               isWeak
                 ? "fill-amber-400 text-amber-400"
-                : "text-muted-foreground/50 hover:text-amber-400 hover:fill-amber-200"
+                : "text-muted-foreground/35 hover:text-amber-400 hover:fill-amber-200"
             )}
           />
         </button>
